@@ -1,0 +1,2403 @@
+```html
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>星際字彙搶答終端 - Space Shooter Reward Edition</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;800;900&family=Noto+Sans+TC:wght@500;700;900&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', 'Noto Sans TC', sans-serif;
+            background: radial-gradient(circle at center, #120b36 0%, #05021a 100%);
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        
+        /* 針對行動裝置防誤觸與優化 */
+        .kahoot-btn {
+            transition: transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.15s ease;
+            touch-action: manipulation;
+        }
+        .kahoot-btn:active {
+            transform: scale(0.95);
+        }
+        .fire-streak {
+            text-shadow: 0 0 10px rgba(239, 68, 68, 0.8), 0 0 20px rgba(245, 158, 11, 0.5);
+        }
+        
+        /* 畫面震動效果 (答錯) */
+        @keyframes shake {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            10% { transform: translate(-4px, -2px) rotate(-1deg); }
+            20% { transform: translate(3px, 2px) rotate(1deg); }
+            30% { transform: translate(-3px, 1px) rotate(-0.5deg); }
+            40% { transform: translate(2px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-0.5deg); }
+            60% { transform: translate(1px, -2px) rotate(0.5deg); }
+            70% { transform: translate(-2px, 1px) rotate(-1deg); }
+            80% { transform: translate(2px, 1px) rotate(0.5deg); }
+            90% { transform: translate(-1px, -1px) rotate(-0.5deg); }
+        }
+        .shake-active {
+            animation: shake 0.45s cubic-bezier(.36,.07,.19,.97) both;
+            box-shadow: inset 0 0 50px rgba(239, 68, 68, 0.4);
+        }
+
+        /* 答對脈衝光暈效果 */
+        @keyframes pulse-success {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); }
+            70% { box-shadow: 0 0 0 25px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+        .pulse-success-active {
+            animation: pulse-success 0.6s cubic-bezier(0.25, 0, 0, 1);
+        }
+        
+        /* 掃描線與霓虹呼吸特效 */
+        @keyframes scanline {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(100%); }
+        }
+        .scanline-effect::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(to bottom, rgba(147, 51, 234, 0) 0%, rgba(147, 51, 234, 0.05) 10%, rgba(147, 51, 234, 0) 20%);
+            animation: scanline 6s linear infinite;
+            pointer-events: none;
+        }
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 15px rgba(147, 51, 234, 0.3); }
+            50% { box-shadow: 0 0 30px rgba(147, 51, 234, 0.7); }
+        }
+        .glow-btn {
+            animation: pulse-glow 2s infinite;
+        }
+
+        /* 漸變流暢動畫 */
+        .screen-fade {
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+
+        /* 隱藏滾動條 */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.3);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(99, 102, 241, 0.5);
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="text-slate-100 min-h-screen flex flex-col justify-between overflow-x-hidden scanline-effect relative">
+
+    <!-- 🔊 網頁原生音效合成器與 TTS 引擎 -->
+    <script>
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playSound(type, optionVal = 0) {
+            try {
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                
+                if (type === 'tick') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+                    gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.08);
+                } else if (type === 'tick-high') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
+                    gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.15);
+                } else if (type === 'correct') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); 
+                    osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.06); 
+                    osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.12); 
+                    osc.frequency.setValueAtTime(1046.50, audioCtx.currentTime + 0.18); 
+                    osc.frequency.setValueAtTime(1318.51, audioCtx.currentTime + 0.24); 
+                    gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.45);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.45);
+                } else if (type === 'combo') {
+                    const baseFreq = 440 + (optionVal * 80); 
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(baseFreq, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(baseFreq * 2, audioCtx.currentTime + 0.25);
+                    gain.gain.setValueAtTime(0.06, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.25);
+                } else if (type === 'shock') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(180, audioCtx.currentTime);
+                    osc.frequency.linearRampToValueAtTime(40, audioCtx.currentTime + 0.35);
+                    gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.35);
+                } else if (type === 'wrong') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(120, audioCtx.currentTime);
+                    osc.frequency.linearRampToValueAtTime(60, audioCtx.currentTime + 0.25);
+                    gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.25);
+                } else if (type === 'laser') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(110, audioCtx.currentTime + 0.15);
+                    gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.15);
+                } else if (type === 'explode') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(100, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(10, audioCtx.currentTime + 0.3);
+                    gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.3);
+                } else if (type === 'powerup') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); 
+                    osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.08); 
+                    osc.frequency.setValueAtTime(1174.66, audioCtx.currentTime + 0.16); 
+                    gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.3);
+                } else if (type === 'boss-alert') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(330, audioCtx.currentTime);
+                    osc.frequency.linearRampToValueAtTime(220, audioCtx.currentTime + 0.5);
+                    gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.6);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.6);
+                } else if (type === 'unlock') {
+                    const notes = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 1046.50];
+                    notes.forEach((f, i) => {
+                        const o = audioCtx.createOscillator();
+                        const g = audioCtx.createGain();
+                        o.connect(g);
+                        g.connect(audioCtx.destination);
+                        o.type = 'triangle';
+                        o.frequency.setValueAtTime(f, audioCtx.currentTime + i * 0.06);
+                        g.gain.setValueAtTime(0.06, audioCtx.currentTime + i * 0.06);
+                        g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + i * 0.06 + 0.2);
+                        o.start(audioCtx.currentTime + i * 0.06);
+                        o.stop(audioCtx.currentTime + i * 0.06 + 0.2);
+                    });
+                }
+            } catch (e) {
+                console.log("音效加載受瀏覽器交互策略限制");
+            }
+        }
+
+        function speakEng(text) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'en-US';
+                utterance.rate = 0.82; 
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+    </script>
+
+    <!-- 🌌 背景粒子 Canvas -->
+    <canvas id="bg-stars-canvas" class="absolute inset-0 w-full h-full pointer-events-none z-0"></canvas>
+
+    <!-- 📱 橫向螢幕偵測與自動提示 -->
+    <div id="landscape-alert" class="hidden fixed inset-0 bg-slate-950/95 z-[150] flex flex-col items-center justify-center p-6 text-center md:hidden screen-fade">
+        <div class="relative w-20 h-20 mb-6 flex items-center justify-center">
+            <div class="absolute inset-0 rounded-full border border-cyan-500/30 animate-ping"></div>
+            <i class="fa-solid fa-rotate text-5xl text-cyan-400 animate-spin [animation-duration:3s]"></i>
+        </div>
+        <h3 class="text-xl font-black text-white mb-2">建議旋轉螢幕</h3>
+        <p class="text-slate-400 text-xs max-w-xs mb-6 leading-relaxed">
+            旋轉至「橫向（Landscape）」螢幕可以獲得最佳的雷射戰機防禦視野與舒適的答題按鈕體驗！
+        </p>
+        <button onclick="dismissLandscapeAlert()" class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-extrabold px-8 py-3 rounded-xl text-xs tracking-wider shadow-lg">
+            保持直向繼續
+        </button>
+    </div>
+
+    <!-- ⚠️ 自訂確認清除紀錄對話框 -->
+    <div id="modal-confirm" class="hidden fixed inset-0 bg-slate-950/80 z-[200] flex flex-col items-center justify-center p-4 screen-fade opacity-0">
+        <div class="bg-slate-900 border border-rose-500/40 rounded-3xl p-6 max-w-sm w-full text-center space-y-4 shadow-2xl">
+            <div class="w-12 h-12 bg-rose-500/10 rounded-full flex items-center justify-center text-rose-500 text-xl mx-auto">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <h4 class="text-lg font-black text-white">確定清除紀錄？</h4>
+            <p class="text-xs text-slate-400 leading-relaxed">
+                清除後，您的歷史最高紀錄與累計遊玩次數將被永遠歸零，且無法復原！
+            </p>
+            <div class="grid grid-cols-2 gap-3 pt-2">
+                <button onclick="closeConfirmModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-extrabold py-2.5 px-4 rounded-xl text-xs transition-colors">
+                    取消
+                </button>
+                <button onclick="executeResetStats()" class="bg-rose-600 hover:bg-rose-500 text-white font-extrabold py-2.5 px-4 rounded-xl text-xs transition-colors shadow-lg shadow-rose-600/20">
+                    確定清除
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 💾 發現未完成關卡存檔對話框 -->
+    <div id="modal-restore-session" class="hidden fixed inset-0 bg-slate-950/85 z-[200] flex flex-col items-center justify-center p-4 screen-fade opacity-0">
+        <div class="bg-slate-900 border border-cyan-500/40 rounded-3xl p-6 max-w-sm w-full text-center space-y-4 shadow-2xl">
+            <div class="w-12 h-12 bg-cyan-500/10 rounded-full flex items-center justify-center text-cyan-400 text-xl mx-auto animate-pulse">
+                <i class="fa-solid fa-cloud-arrow-down animate-bounce"></i>
+            </div>
+            <h4 class="text-lg font-black text-white">發現未完成的星際航線</h4>
+            <p class="text-xs text-slate-400 leading-relaxed">
+                偵測到您上次在關卡 <strong id="restore-progress" class="text-cyan-400 font-orbitron">0/41</strong> 斷開傳輸。是否加載該時空存檔並繼續前進？
+            </p>
+            <div class="grid grid-cols-2 gap-3 pt-2">
+                <button onclick="rejectSavedSession()" class="bg-slate-800 hover:bg-slate-700 text-slate-400 font-extrabold py-2.5 px-4 rounded-xl text-xs transition-colors">
+                    重新開始
+                </button>
+                <button onclick="acceptSavedSession()" class="bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-extrabold py-2.5 px-4 rounded-xl text-xs transition-colors shadow-lg shadow-cyan-600/20">
+                    加載並繼續
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 頂部資訊與計分板 -->
+    <header class="bg-slate-950/70 border-b border-purple-950/60 backdrop-blur-md px-6 py-4 sticky top-0 z-50">
+        <div class="max-w-5xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center text-white shadow-lg shadow-purple-500/20">
+                    <i class="fa-solid fa-gamepad text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="font-extrabold text-sm sm:text-base text-purple-300 leading-none">星際搶答終端</h1>
+                    <span class="text-[10px] text-slate-400 font-extrabold tracking-wider uppercase">Vocabulary Arcade</span>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-4 sm:gap-8 font-extrabold text-xs sm:text-sm">
+                <!-- 連擊勳章 -->
+                <div id="streak-badge" class="hidden items-center gap-1.5 text-orange-400 bg-orange-950/40 px-3 py-1.5 rounded-full border border-orange-500/40 shadow-[0_0_15px_rgba(249,115,22,0.2)] animate-pulse">
+                    <i class="fa-solid fa-fire text-orange-500 text-sm"></i>
+                    <span>COMBO: <strong id="streak-count" class="fire-streak text-sm">0</strong></span>
+                    <span id="multiplier-tag" class="bg-orange-500 text-slate-950 px-1.5 py-0.5 rounded text-[9px] font-black leading-none">1.0x</span>
+                </div>
+                <div class="text-right">
+                    <span class="text-slate-400 block text-[9px] uppercase tracking-widest font-bold">SCORE</span>
+                    <span id="global-score" class="text-yellow-400 text-lg sm:text-xl font-black">0</span>
+                </div>
+                <div class="text-right hidden sm:block">
+                    <span class="text-slate-400 block text-[9px] uppercase tracking-widest font-bold">GAME TICKET</span>
+                    <span id="ticket-progress-text" class="text-cyan-400 text-sm font-black">0 / 5</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主要視窗管理系統 -->
+    <main class="flex-grow flex items-center justify-center px-4 py-6 z-10">
+        <div class="w-full max-w-4xl">
+
+            <!-- 🟢 1. 遊戲開始與載入頁面 (集成自選題數功能) -->
+            <div id="screen-start" class="bg-slate-900/40 border border-purple-500/30 rounded-3xl p-6 sm:p-10 text-center space-y-6 max-w-xl mx-auto backdrop-blur-md shadow-2xl relative overflow-hidden transition-all duration-500 transform hover:scale-[1.01]">
+                <div class="absolute -right-20 -bottom-20 w-60 h-60 bg-purple-600/10 rounded-full blur-3xl"></div>
+                <div class="absolute -left-20 -top-20 w-60 h-60 bg-indigo-600/10 rounded-full blur-3xl"></div>
+                
+                <div class="relative w-20 h-20 mx-auto mb-1">
+                    <div class="absolute inset-0 rounded-full border-2 border-dashed border-purple-500/40 animate-[spin_12s_linear_infinite]"></div>
+                    <div class="absolute inset-2 rounded-full border border-double border-cyan-500/30 animate-[spin_6s_linear_infinite_reverse]"></div>
+                    <div class="absolute inset-4 bg-purple-500/10 border border-purple-500/30 rounded-full flex items-center justify-center text-purple-400 text-2xl">
+                        <i class="fa-solid fa-shuttle-space animate-bounce"></i>
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <h2 class="text-2xl sm:text-3xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-white via-purple-200 to-cyan-300 drop-shadow">
+                        星際精準搶答擂台
+                    </h2>
+                    <p class="text-slate-300 text-xs sm:text-sm leading-relaxed max-w-md mx-auto">
+                        單字提示已被隱藏，請在 20 秒內解鎖情境。
+                        <span class="text-cyan-300 font-bold block mt-0.5">每答對 5 題，即可解鎖雷射戰機防禦小遊戲！</span>
+                    </p>
+                </div>
+
+                <!-- 🔢 自選題數按鈕組 -->
+                <div class="space-y-2 bg-slate-950/40 p-4 rounded-2xl border border-purple-950/40 max-w-md mx-auto text-left">
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block text-center mb-1">
+                        <i class="fa-solid fa-list-ol mr-1 text-purple-400"></i> 選擇挑戰題數 / SELECT COUNT
+                    </label>
+                    <div class="grid grid-cols-5 gap-2" id="question-count-selector">
+                        <button onclick="selectQuestionCount(5)" id="btn-count-5" class="py-2 rounded-xl text-xs font-black border transition-all duration-300 bg-slate-900 border-slate-800 text-slate-400 hover:border-purple-500/50 hover:text-purple-300">5題</button>
+                        <button onclick="selectQuestionCount(10)" id="btn-count-10" class="py-2 rounded-xl text-xs font-black border transition-all duration-300 bg-slate-900 border-slate-800 text-slate-400 hover:border-purple-500/50 hover:text-purple-300">10題</button>
+                        <button onclick="selectQuestionCount(15)" id="btn-count-15" class="py-2 rounded-xl text-xs font-black border transition-all duration-300 bg-slate-900 border-slate-800 text-slate-400 hover:border-purple-500/50 hover:text-purple-300">15題</button>
+                        <button onclick="selectQuestionCount(30)" id="btn-count-30" class="py-2 rounded-xl text-xs font-black border transition-all duration-300 bg-slate-900 border-slate-800 text-slate-400 hover:border-purple-500/50 hover:text-purple-300">30題</button>
+                        <button onclick="selectQuestionCount(41)" id="btn-count-41" class="py-2 rounded-xl text-xs font-black border transition-all duration-300 bg-slate-900 border-slate-800 text-slate-400 hover:border-purple-500/50 hover:text-purple-300">41題</button>
+                    </div>
+                </div>
+
+                <!-- 📊 本地統計排行榜看板 -->
+                <div class="grid grid-cols-2 gap-4 bg-slate-950/60 p-4 rounded-2xl border border-purple-950/50 text-sm">
+                    <div class="border-r border-purple-950/40">
+                        <span class="text-slate-400 text-xs block"><i class="fa-solid fa-trophy text-yellow-500 mr-1"></i> 歷史最高紀錄</span>
+                        <strong class="text-yellow-400 text-xl font-black font-orbitron" id="start-high-score">0</strong>
+                    </div>
+                    <div>
+                        <span class="text-slate-400 text-xs block"><i class="fa-solid fa-gamepad text-purple-400 mr-1"></i> 累計挑戰次數</span>
+                        <strong class="text-purple-300 text-xl font-black font-orbitron" id="start-play-count">0</strong>
+                    </div>
+                </div>
+
+                <div class="flex justify-between items-center text-[11px] text-slate-500 px-2">
+                    <span id="start-last-played" class="hidden">上次挑戰: 2026/07/09</span>
+                    <button onclick="openConfirmModal()" class="hover:text-rose-400 transition-colors flex items-center gap-1">
+                        <i class="fa-solid fa-trash-can text-[10px]"></i> 清除紀錄
+                    </button>
+                </div>
+
+                <button onclick="requestStart()" class="glow-btn w-full bg-gradient-to-r from-purple-600 via-indigo-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 text-white font-black py-4 px-6 rounded-2xl transition-all shadow-lg text-sm tracking-widest uppercase flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-bolt"></i> 啟動搶答引擎 (全螢幕) <i class="fa-solid fa-play"></i>
+                </button>
+            </div>
+
+            <!-- 🎬 巨型 3, 2, 1, GO 倒數計時遮罩 -->
+            <div id="screen-countdown" class="hidden fixed inset-0 bg-slate-950/90 z-[100] flex flex-col items-center justify-center screen-fade">
+                <div class="text-center">
+                    <div id="countdown-text" class="text-[10px] text-purple-400 tracking-widest font-bold uppercase mb-4 animate-pulse">
+                        READY FOR HYPERSPACE?
+                    </div>
+                    <div class="h-48 flex items-center justify-center select-none">
+                        <span id="countdown-number" class="text-8xl sm:text-9xl font-black text-purple-400 font-orbitron transition-all duration-300 transform">3</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 🔵 2. KAHOOT! 搶答與回饋面板 -->
+            <div id="screen-quiz" class="hidden space-y-6 screen-fade">
+                
+                <div class="flex items-center justify-between bg-slate-950/60 p-4 rounded-2xl border border-slate-900">
+                    <div class="flex items-center gap-3">
+                        <span class="bg-purple-500/10 text-purple-400 text-xs font-bold px-3 py-1.5 rounded-lg border border-purple-500/20">
+                            QUESTION: <span id="quiz-index-text">1 / 41</span>
+                        </span>
+                        <span class="bg-cyan-500/10 text-cyan-400 text-xs font-bold px-3 py-1.5 rounded-lg border border-cyan-500/20 sm:hidden">
+                            🎟️ <span id="mini-ticket-text">0 / 5</span>
+                        </span>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-clock text-rose-500 animate-pulse"></i>
+                        <span id="time-left" class="font-orbitron font-extrabold text-lg text-rose-400">20s</span>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900/50 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-4">
+                    <p class="text-[10px] text-cyan-400 font-orbitron tracking-widest font-black uppercase">Contextual Cipher / 上下文解密</p>
+                    <h3 id="question-prompt" class="text-lg sm:text-2xl font-bold leading-relaxed text-slate-100 min-h-[4.5rem]">
+                        The teacher called Kevin's parents because of his ______ from school today.
+                    </h3>
+                </div>
+
+                <!-- Kahoot! 4色大按鈕 -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="options-panel">
+                    <button onclick="handleOptionSelect(0, event)" class="kahoot-btn w-full bg-red-500 hover:bg-red-400 text-white p-5 sm:p-6 rounded-2xl flex items-center justify-between text-left font-bold text-lg sm:text-xl shadow-lg shadow-red-500/10">
+                        <span class="flex items-center gap-4">
+                            <span class="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center text-xl">▲</span>
+                            <span id="opt-text-0">Option A</span>
+                        </span>
+                        <i class="fa-regular fa-circle text-white/40 text-lg"></i>
+                    </button>
+
+                    <button onclick="handleOptionSelect(1, event)" class="kahoot-btn w-full bg-blue-500 hover:bg-blue-400 text-white p-5 sm:p-6 rounded-2xl flex items-center justify-between text-left font-bold text-lg sm:text-xl shadow-lg shadow-blue-500/10">
+                        <span class="flex items-center gap-4">
+                            <span class="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center text-xl">◆</span>
+                            <span id="opt-text-1">Option B</span>
+                        </span>
+                        <i class="fa-regular fa-circle text-white/40 text-lg"></i>
+                    </button>
+
+                    <button onclick="handleOptionSelect(2, event)" class="kahoot-btn w-full bg-yellow-500 hover:bg-yellow-400 text-slate-950 p-5 sm:p-6 rounded-2xl flex items-center justify-between text-left font-bold text-lg sm:text-xl shadow-lg shadow-yellow-500/10">
+                        <span class="flex items-center gap-4">
+                            <span class="w-10 h-10 rounded-lg bg-black/10 flex items-center justify-center text-xl">●</span>
+                            <span id="opt-text-2">Option C</span>
+                        </span>
+                        <i class="fa-regular fa-circle text-black/20 text-lg"></i>
+                    </button>
+
+                    <button onclick="handleOptionSelect(3, event)" class="kahoot-btn w-full bg-green-500 hover:bg-green-400 text-white p-5 sm:p-6 rounded-2xl flex items-center justify-between text-left font-bold text-lg sm:text-xl shadow-lg shadow-green-500/10">
+                        <span class="flex items-center gap-4">
+                            <span class="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center text-xl">■</span>
+                            <span id="opt-text-3">Option D</span>
+                        </span>
+                        <i class="fa-regular fa-circle text-white/40 text-lg"></i>
+                    </button>
+                </div>
+
+                <div id="feedback-card" class="hidden bg-slate-950 border rounded-3xl p-6 space-y-4 screen-fade opacity-0">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span id="feedback-badge-icon" class="w-8 h-8 rounded-full flex items-center justify-center"></span>
+                            <h4 id="feedback-title" class="font-black text-lg">答對了！</h4>
+                        </div>
+                        <button onclick="speakCorrectExample()" class="w-9 h-9 rounded-full bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 flex items-center justify-center border border-purple-500/20 transition-all">
+                            <i class="fa-solid fa-volume-high text-xs"></i>
+                        </button>
+                    </div>
+
+                    <div class="space-y-2 border-t border-slate-900 pt-3">
+                        <p id="feedback-sentence-en" class="text-base sm:text-lg text-slate-100 font-bold leading-relaxed"></p>
+                        <p id="feedback-sentence-zh" class="text-xs sm:text-sm text-slate-400 leading-relaxed"></p>
+                        <div class="p-3 bg-slate-900/60 rounded-xl border border-slate-900 text-xs text-slate-300 leading-relaxed mt-2" id="feedback-rationale-text">
+                            分析詳解
+                        </div>
+                    </div>
+
+                    <button onclick="goToNextStep()" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-extrabold py-4 px-4 rounded-xl flex items-center justify-center gap-2 transition-all">
+                        繼續前進 <i class="fa-solid fa-arrow-right text-xs"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 🚀 3. 太空射擊獎勵小遊戲 -->
+            <div id="screen-game" class="hidden max-w-2xl mx-auto space-y-4 screen-fade">
+                <div class="bg-gradient-to-r from-slate-950 via-cyan-950 to-indigo-950 border-2 border-cyan-500/40 rounded-3xl p-4 sm:p-6 text-center space-y-3 relative overflow-hidden">
+                    <div class="absolute -left-10 -top-10 w-24 h-24 bg-cyan-500/10 rounded-full blur-xl"></div>
+                    
+                    <div class="flex justify-between items-center text-xs font-extrabold">
+                        <span id="game-title-text" class="text-cyan-400 tracking-widest"><i class="fa-solid fa-shield-halved mr-1 animate-pulse"></i> 答對獎勵：太空防禦戰</span>
+                        <span class="text-amber-400">剩餘時間: <strong id="game-timer" class="font-orbitron text-sm">30s</strong></span>
+                    </div>
+
+                    <div class="flex justify-between items-center bg-slate-950/80 px-4 py-2.5 rounded-2xl border border-slate-800 text-xs font-bold">
+                        <div class="flex items-center gap-2">
+                            <span class="text-slate-400 text-[10px]">離子防護罩 SHIELD:</span>
+                            <span id="game-hp-stars" class="text-emerald-400 text-base">🛡️ 🛡️ 🛡️</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-slate-400 text-[10px]">主炮武器系統:</span>
+                            <span id="game-weapon-badge" class="bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 px-2 py-0.5 rounded text-[10px] font-black tracking-wide">標準雷射</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-black rounded-2xl border-2 border-cyan-500/30 relative overflow-hidden h-[360px] sm:h-[400px]">
+                        <canvas id="shooter-canvas" class="w-full h-full block bg-slate-950"></canvas>
+                        <div class="absolute bottom-4 left-4 right-4 flex justify-between pointer-events-none md:hidden z-10">
+                            <span class="text-[10px] text-slate-500 font-bold bg-slate-950/80 px-3 py-2 rounded-full leading-none">左右滑動螢幕移動戰機（自動發射雷射）</span>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-between items-center bg-slate-950/60 p-3 rounded-xl border border-slate-900 text-xs">
+                        <span class="text-slate-400">本局擊落積分: <strong id="game-score" class="text-cyan-400">0</strong></span>
+                        <span class="text-slate-500">提示：摧毀隕石或擊退 BOSS 有機率獲得武器道具！</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 🏆 4. 全破結算頁籤 (📊 大幅升級為深度戰績分析報告) -->
+            <div id="screen-victory" class="hidden bg-slate-950 border border-purple-500/30 rounded-3xl p-6 sm:p-8 text-center space-y-6 max-w-2xl mx-auto shadow-2xl screen-fade opacity-0 max-h-[85vh] overflow-y-auto">
+                <div class="flex items-center justify-center gap-3">
+                    <div class="w-12 h-12 bg-yellow-500/10 rounded-full border border-yellow-400/30 flex items-center justify-center text-yellow-400 text-2xl animate-bounce">
+                        <i class="fa-solid fa-crown"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-2xl font-black text-yellow-400 tracking-wider text-left leading-none">任務完成，航線清空！</h3>
+                        <span class="text-[10px] text-slate-400 tracking-widest font-black uppercase text-left block">MISSION RESOLVED</span>
+                    </div>
+                </div>
+                
+                <!-- 👑 新紀錄高亮提示面板 -->
+                <div id="new-record-banner" class="hidden bg-gradient-to-r from-yellow-500/20 via-amber-500/30 to-yellow-500/20 text-yellow-300 border border-yellow-400/50 rounded-2xl py-3 px-4 text-xs font-black tracking-widest animate-pulse shadow-[0_0_15px_rgba(234,179,8,0.2)]">
+                    🚀 🎉 恭喜突破歷史最高分數紀錄！ NEW RECORD 🎉 🚀
+                </div>
+
+                <!-- 📊 任務評級與數據儀表板 -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <!-- 1. 任務評級 S/A/B/C -->
+                    <div class="bg-slate-900/60 p-4 rounded-2xl border border-slate-800 flex flex-col justify-center items-center">
+                        <span class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">航行能力判定</span>
+                        <div id="report-rank" class="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-amber-500 font-orbitron my-2">S</div>
+                        <span id="report-rank-text" class="text-xs text-yellow-400 font-bold">超星系主宰</span>
+                    </div>
+
+                    <!-- 2. 核心數據報告 -->
+                    <div class="bg-slate-900/60 p-4 rounded-2xl border border-slate-800 md:col-span-2 text-left space-y-3">
+                        <span class="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">航行數據儀表盤</span>
+                        
+                        <div class="grid grid-cols-2 gap-3 text-xs">
+                            <div>
+                                <span class="text-slate-400 block">總得分 Score</span>
+                                <strong id="report-total-score" class="text-yellow-400 text-base font-orbitron">0</strong>
+                            </div>
+                            <div>
+                                <span class="text-slate-400 block">答題準確率 Accuracy</span>
+                                <strong id="report-accuracy" class="text-emerald-400 text-base font-orbitron">0%</strong>
+                            </div>
+                            <div>
+                                <span class="text-slate-400 block">平均解碼反應 Speed</span>
+                                <strong id="report-speed" class="text-cyan-400 text-base font-orbitron">0.0s / 題</strong>
+                            </div>
+                            <div>
+                                <span class="text-slate-400 block">解鎖防禦小遊戲</span>
+                                <strong id="report-games-played" class="text-purple-400 text-base font-orbitron">0 次</strong>
+                            </div>
+                        </div>
+
+                        <!-- 隕石擊落與 Boss 擊沉成績 -->
+                        <div class="border-t border-slate-800 pt-2 flex justify-between text-[11px] text-slate-400">
+                            <span>🪐 隕石擊碎: <strong id="report-asteroids" class="text-cyan-300 font-orbitron">0</strong></span>
+                            <span>🛸 旗艦擊沉: <strong id="report-bosses" class="text-rose-400 font-orbitron">0</strong></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ⚠️ 最容易答錯的題目 / 弱點偵測 (動態產生) -->
+                <div id="wrong-questions-section" class="hidden text-left bg-slate-950/60 border border-slate-900 p-4 rounded-2xl space-y-3">
+                    <h5 class="text-xs font-black text-rose-400 tracking-wider uppercase"><i class="fa-solid fa-compass-drafting mr-1"></i> 需要加強的星際字彙 (錯題清單)</h5>
+                    <div id="wrong-questions-list" class="space-y-2 max-h-[160px] overflow-y-auto pr-1">
+                        <!-- JS 動態生成錯題清單 -->
+                    </div>
+                </div>
+
+                <button onclick="restartAll()" class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-extrabold py-3.5 px-6 rounded-xl transition-all shadow-md active:scale-95 text-sm uppercase tracking-widest">
+                    重啟下一趟探險航星 <i class="fa-solid fa-rotate-right ml-1"></i>
+                </button>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- 底部便利單字字典清單 -->
+    <div class="max-w-4xl w-full mx-auto px-4 pb-8 z-10" id="dictionary-section">
+        <details class="bg-slate-950/40 border border-slate-900 rounded-2xl group">
+            <summary class="p-4 cursor-pointer text-xs font-extrabold text-slate-400 hover:text-slate-200 select-none flex justify-between items-center">
+                <span><i class="fa-solid fa-book-open mr-2 text-purple-400"></i> 星際快捷單字清單 (共 41 個字)</span>
+                <i class="fa-solid fa-chevron-down group-open:rotate-180 transition-transform"></i>
+            </summary>
+            <div class="p-4 border-t border-slate-900 max-h-[300px] overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-950/60" id="quick-dict-grid">
+                <!-- JS 動態生成 -->
+            </div>
+        </details>
+    </div>
+
+    <!-- 頁尾宣告 -->
+    <footer class="border-t border-purple-950/30 bg-slate-950/60 py-4 text-center text-[10px] text-slate-500 z-10">
+        <p>© 2026 國中進階英語字彙搶答平台. Designed to spark motivation.</p>
+    </footer>
+
+    <!-- 🔮 星際搶答與太空射擊引擎核心 JavaScript -->
+    <script>
+        // 41個核心進階單字資料集 - 已完成完美審核校對
+        const quizDB = [
+            {
+                word: "absence",
+                question: "The teacher called Kevin's parents because of his ______ from school today.",
+                options: ["affair", "absence", "argument", "advance"],
+                answer: 1,
+                sentenceEn: "The teacher called Kevin's parents because of his <span class='text-yellow-400 underline'>absence</span> from school today.",
+                sentenceEnPlain: "The teacher called Kevin's parents because of his absence from school today.",
+                sentenceZh: "老師今天因為 Kevin 缺席而打電話給他的父母。",
+                explain: "absence (n.) 缺席、不在場。常搭配 absence from... (從...中缺席)。"
+            },
+            {
+                word: "address",
+                question: "The President will ______ the nation on TV tonight to talk about the new law.",
+                options: ["address", "arrange", "bathe", "bind"],
+                answer: 0,
+                sentenceEn: "The President will <span class='text-yellow-400 underline'>address</span> the nation on TV tonight to talk about the new law.",
+                sentenceEnPlain: "The President will address the nation on TV tonight to talk about the new law.",
+                sentenceZh: "總統今晚將在電視上向全國發表談話，以談論新法案。",
+                explain: "address (v.) 向…發表演說、對…致詞。"
+            },
+            {
+                word: "advance",
+                question: "If you want a good seat at the concert, you should buy the tickets in ______.",
+                options: ["agreement", "advance", "appearance", "appetite"],
+                answer: 1,
+                sentenceEn: "If you want a good seat at the concert, you should buy the tickets in <span class='text-yellow-400 underline'>advance</span>.",
+                sentenceEnPlain: "If you want a good seat at the concert, you should buy the tickets in advance.",
+                sentenceZh: "如果你想要演唱會的好座位，你應該提前買票。",
+                explain: "in advance (phr.) 預先、提前。為高頻重點搭配用法。"
+            },
+            {
+                word: "affair",
+                question: "Dealing with international ______ is a very difficult job for the government.",
+                options: ["affairs", "ankles", "barbers", "balconies"],
+                answer: 0,
+                sentenceEn: "Dealing with international <span class='text-yellow-400 underline'>affairs</span> is a very difficult job for the government.",
+                sentenceEnPlain: "Dealing with international affairs is a very difficult job for the government.",
+                sentenceZh: "處理國際事務對於政府來說是一項非常艱巨的工作。",
+                explain: "affair (n.) 事務、事件。通常複數 affairs 泛指公共或私人事務。"
+            },
+            {
+                word: "aid",
+                question: "The search team provided first ______ to the hikers who got lost in the cold mountains.",
+                options: ["basis", "anger", "aid", "belief"],
+                answer: 2,
+                sentenceEn: "The search team provided first <span class='text-yellow-400 underline'>aid</span> to the hikers who got lost in the cold mountains.",
+                sentenceEnPlain: "The search team provided first aid to the hikers who got lost in the cold mountains.",
+                sentenceZh: "搜救隊為在寒冷山區迷路的登山客提供了急救。",
+                explain: "aid (n./v.) 幫助、援助。first aid 意為「急救（包/措施）」。"
+            },
+            {
+                word: "agreement",
+                question: "After negotiating for hours, they finally signed a peace ______ to stop the war.",
+                options: ["argument", "arrangement", "agreement", "appearance"],
+                answer: 2,
+                sentenceEn: "After negotiating for hours, they finally signed a peace <span class='text-yellow-400 underline'>agreement</span> to stop the war.",
+                sentenceEnPlain: "After negotiating for hours, they finally signed a peace agreement to stop the war.",
+                sentenceZh: "在協商數小時後，他們終於簽署了和平協定以結束戰爭。",
+                explain: "agreement (n.) 協定、共識。reach/sign an agreement 意為達成/簽署協定。"
+            },
+            {
+                word: "aim",
+                question: "My main ______ this year is to pass the English exam with excellent grades.",
+                options: ["amount", "aim", "ankle", "basis"],
+                answer: 1,
+                sentenceEn: "My main <span class='text-yellow-400 underline'>aim</span> this year is to pass the English exam with excellent grades.",
+                sentenceEnPlain: "My main aim this year is to pass the English exam with excellent grades.",
+                sentenceZh: "我今年的主要目標是以優異的成績通過英語考試。",
+                explain: "aim (n./v.) 目標、針對。在此作名詞用，意同 goal。"
+            },
+            {
+                word: "almond",
+                question: "My sister loves to eat chocolate filled with ______ nuts because they are crispy and sweet.",
+                options: ["almond", "bony", "bark", "barber"],
+                answer: 0,
+                sentenceEn: "My sister loves to eat chocolate filled with <span class='text-yellow-400 underline'>almond</span> nuts because they are crispy and sweet.",
+                sentenceEnPlain: "My sister loves to eat chocolate filled with almond nuts because they are crispy and sweet.",
+                sentenceZh: "我妹妹喜歡吃夾有杏仁果的巧克力，因為它們酥脆又香甜。",
+                explain: "almond (n.) 杏仁、扁桃仁。almond nuts 即為杏仁果實。"
+            },
+            {
+                word: "ankle",
+                question: "He slipped on the wet floor and hurt his ______ , so now he cannot walk or run.",
+                options: ["beard", "ankle", "balcony", "basement"],
+                answer: 1,
+                sentenceEn: "He slipped on the wet floor and hurt his <span class='text-yellow-400 underline'>ankle</span>, so now he cannot walk or run.",
+                sentenceEnPlain: "He slipped on the wet floor and hurt his ankle, so now he cannot walk or run.",
+                sentenceZh: "他在潮濕的地板上滑倒，傷了腳踝，所以現在無法行走和跑步。",
+                explain: "ankle (n.) 腳踝。"
+            },
+            {
+                word: "amount",
+                question: "Drinking a large ______ of soda every day is very bad for your teeth.",
+                options: ["amount", "basis", "affair", "belief"],
+                answer: 0,
+                sentenceEn: "Drinking a large <span class='text-yellow-400 underline'>amount</span> of soda every day is very bad for your teeth.",
+                sentenceEnPlain: "Drinking a large amount of soda every day is very bad for your teeth.",
+                sentenceZh: "每天喝大量的汽水對你的牙齒非常不好。",
+                explain: "amount (n.) 數量。通常指不可數名詞的數量，如 money, water, soda。"
+            },
+            {
+                word: "altogether",
+                question: "I bought a pencil, an eraser, and a ruler, which cost seventy dollars ______.",
+                options: ["anyhow", "altogether", "beyond", "advance"],
+                answer: 1,
+                sentenceEn: "I bought a pencil, an eraser, and a ruler, which cost seventy dollars <span class='text-yellow-400 underline'>altogether</span>.",
+                sentenceEnPlain: "I bought a pencil, an eraser, and a ruler, which cost seventy dollars altogether.",
+                sentenceZh: "我買了鉛筆、橡皮擦和直尺，總共花了七十元。",
+                explain: "altogether (adv.) 總共、完全。放在句尾作修飾用。"
+            },
+            {
+                word: "anger",
+                question: "He tried to control his ______ when his little brother broke his favorite model plane.",
+                options: ["appetite", "anger", "appearance", "agreement"],
+                answer: 1,
+                sentenceEn: "He tried to control his <span class='text-yellow-400 underline'>anger</span> when his little brother broke his favorite model plane.",
+                sentenceEnPlain: "He tried to control his anger when his little brother broke his favorite model plane.",
+                sentenceZh: "當他弟弟弄壞他最喜歡的飛機模型時，他試圖克制住怒火。",
+                explain: "anger (n.) 憤怒。"
+            },
+            {
+                word: "anyhow",
+                question: "The bus was late, but we made it to school on time ______ because we ran fast.",
+                options: ["anyhow", "altogether", "directly", "beyond"],
+                answer: 0,
+                sentenceEn: "The bus was late, but we made it to school on time <span class='text-yellow-400 underline'>anyhow</span> because we ran fast.",
+                sentenceEnPlain: "The bus was late, but we made it to school on time anyhow because we ran fast.",
+                sentenceZh: "公車遲到了，但不管怎樣，我們因為跑得快還是準時到校了。",
+                explain: "anyhow (adv.) 無論如何、管它怎樣、不管以何種方式。"
+            },
+            {
+                word: "argument",
+                question: "The parents had a serious ______ about which school their child should attend.",
+                options: ["arrangement", "agreement", "argument", "appearance"],
+                answer: 2,
+                sentenceEn: "The parents had a serious <span class='text-yellow-400 underline'>argument</span> about which school their child should attend.",
+                sentenceEnPlain: "The parents had a serious argument about which school their child should attend.",
+                sentenceZh: "父母為了孩子應該就讀哪所學校發生了嚴重的爭執。",
+                explain: "argument (n.) 爭執、論點。have an argument with/about 意為與某人爭論/因某事爭執。"
+            },
+            {
+                word: "arrangement",
+                question: "Thanks to my guide's excellent ______ , our trip to Tokyo was perfect.",
+                options: ["appearance", "appetite", "arrangement", "basis"],
+                answer: 2,
+                sentenceEn: "Thanks to my guide's excellent <span class='text-yellow-400 underline'>arrangement</span>, our trip to Tokyo was perfect.",
+                sentenceEnPlain: "Thanks to my guide's excellent arrangement, our trip to Tokyo was perfect.",
+                sentenceZh: "多虧了導遊出色的安排，我們的東京之旅非常完美。",
+                explain: "arrangement (n.) 安排、布置。來自其動詞 arrange。"
+            },
+            {
+                word: "arrange",
+                question: "Please help me ______ these folders in alphabetical order.",
+                options: ["arrange", "bathe", "bind", "bear"],
+                answer: 0,
+                sentenceEn: "Please help me <span class='text-yellow-400 underline'>arrange</span> these folders in alphabetical order.",
+                sentenceEnPlain: "Please help me arrange these folders in alphabetical order.",
+                sentenceZh: "請幫我把這些資料夾按英文字母順序排列好。",
+                explain: "arrange (v.) 整理、排列、安排。"
+            },
+            {
+                word: "appetite",
+                question: "The delicious smell of baked bread always gives me a great ______.",
+                options: ["appearance", "appetite", "amount", "anger"],
+                answer: 1,
+                sentenceEn: "The delicious smell of baked bread always gives me a great <span class='text-yellow-400 underline'>appetite</span>.",
+                sentenceEnPlain: "The delicious smell of baked bread always gives me a great appetite.",
+                sentenceZh: "剛烤好麵包的香味總是讓我胃口大開。",
+                explain: "appetite (n.) 食慾、胃口。"
+            },
+            {
+                word: "appearance",
+                question: "The magical actor changed his ______ completely by wearing a wig and glasses.",
+                options: ["appearance", "arrangement", "belief", "absence"],
+                answer: 0,
+                sentenceEn: "The magical actor changed his <span class='text-yellow-400 underline'>appearance</span> completely by wearing a wig and glasses.",
+                sentenceEnPlain: "The magical actor changed his appearance completely by wearing a wig and glasses.",
+                sentenceZh: "這位神奇的演員戴上假髮 and 眼鏡，徹底改變了自己的外表。",
+                explain: "appearance (n.) 外表、長相、出現。"
+            },
+            {
+                word: "attend",
+                question: "If you want to pass the course, you must ______ every single class.",
+                options: ["attend", "address", "babysit", "bathe"],
+                answer: 0,
+                sentenceEn: "If you want to pass the course, you must <span class='text-yellow-400 underline'>attend</span> every single class.",
+                sentenceEnPlain: "If you want to pass the course, you must attend every single class.",
+                sentenceZh: "如果你想通過這門課程，你必須出席每一節課。",
+                explain: "attend (v.) 出席、參加。"
+            },
+            {
+                word: "babysit",
+                question: "Can you help me ______ my little sister while I go to the supermarket?",
+                options: ["bathe", "babysit", "arrange", "chase"],
+                answer: 1,
+                sentenceEn: "Can you help me <span class='text-yellow-400 underline'>babysit</span> my little sister while I go to the supermarket?",
+                sentenceEnPlain: "Can you help me babysit my little sister while I go to the supermarket.",
+                sentenceZh: "當我去超市時，你能幫我照顧我妹妹嗎？",
+                explain: "babysit (v.) 當臨時保姆照顧（幼兒）。"
+            },
+            {
+                word: "babysitter",
+                question: "We need to hire a reliable ______ to look after the baby on Friday night.",
+                options: ["barber", "babysitter", "chick", "dove"],
+                answer: 1,
+                sentenceEn: "We need to hire a reliable <span class='text-yellow-400 underline'>babysitter</span> to look after the baby on Friday night.",
+                sentenceEnPlain: "We need to hire a reliable babysitter to look after the baby on Friday night.",
+                sentenceZh: "我們需要在週五晚上僱用一個可靠的臨時保姆來照顧嬰兒。",
+                explain: "babysitter (n.) 臨時保姆。"
+            },
+            {
+                word: "pay attention to",
+                question: "Students must ______ the safety rules during the science experiment.",
+                options: ["pay attention to", "band together", "catch up with", "break off"],
+                answer: 0,
+                sentenceEn: "Students must <span class='text-yellow-400 underline'>pay attention to</span> the safety rules during the science experiment.",
+                sentenceEnPlain: "Students must pay attention to the safety rules during the science experiment.",
+                sentenceZh: "學生在進行科學實驗時必須注意安全規則。",
+                explain: "pay attention to (phr.) 注意、關注、留心。"
+            },
+            {
+                word: "balcony",
+                question: "My mother grows beautiful roses in small pots on our ______.",
+                options: ["basement", "bench", "balcony", "cage"],
+                answer: 2,
+                sentenceEn: "My mother grows beautiful roses in small pots on our <span class='text-yellow-400 underline'>balcony</span>.",
+                sentenceEnPlain: "My mother grows beautiful roses in small pots on our balcony.",
+                sentenceZh: "我媽媽在我們陽台的小花盆裡種植著美麗的玫瑰花。",
+                explain: "balcony (n.) 陽台。"
+            },
+            {
+                word: "barber",
+                question: "The ______ cut my hair too short, so now I have to wear a cap to school.",
+                options: ["barber", "babysitter", "chick", "dove"],
+                answer: 0,
+                sentenceEn: "The <span class='text-yellow-400 underline'>barber</span> cut my hair too short, so now I have to wear a cap to school.",
+                sentenceEnPlain: "The barber cut my hair too short, so now I have to wear a cap to school.",
+                sentenceZh: "理髮師把我的頭髮剪得太短了，所以現在我不得不戴帽子去上學。",
+                explain: "barber (n.) 男士理髮師。"
+            },
+            {
+                word: "bark",
+                question: "The ancient people used the ______ of trees to write down their history.",
+                options: ["bank", "bark", "base", "basis"],
+                answer: 1,
+                sentenceEn: "The ancient people used the <span class='text-yellow-400 underline'>bark</span> of trees to write down their history.",
+                sentenceEnPlain: "The ancient people used the bark of trees to write down their history.",
+                sentenceZh: "古人利用樹皮來記錄他們的歷史。",
+                explain: "bark (n.) 樹皮；狗吠聲。在此作樹皮解釋。"
+            },
+            {
+                word: "band together",
+                question: "The small animals had to ______ to protect themselves from the wolf.",
+                options: ["band together", "blow up", "break off", "cut off"],
+                answer: 0,
+                sentenceEn: "The small animals had to <span class='text-yellow-400 underline'>band together</span> to protect themselves from the wolf.",
+                sentenceEnPlain: "The small animals had to band together to protect themselves from the wolf.",
+                sentenceZh: "小動物們不得不團結起來以保護自己免受狼的侵害。",
+                explain: "band together (phr.) 團結起來、聯合。"
+            },
+            {
+                word: "bank",
+                question: "We sat on the grassy ______ of the river, watching the peaceful water flow by.",
+                options: ["base", "bank", "coast", "balcony"],
+                answer: 1,
+                sentenceEn: "We sat on the grassy <span class='text-yellow-400 underline'>bank</span> of the river, watching the peaceful water flow by.",
+                sentenceEnPlain: "We sat on the grassy bank of the river, watching the peaceful water flow by.",
+                sentenceZh: "我們坐在河水長滿草的堤岸上，看著平靜的河水流過。",
+                explain: "bank (n.) 銀行；堤岸、岸。這裡 river bank 指河岸。"
+            },
+            {
+                word: "base",
+                question: "The explorer set up a camp at the ______ of the mountain before climbing to the top.",
+                options: ["basement", "basis", "base", "bench"],
+                answer: 2,
+                sentenceEn: "The explorer set up a camp at the <span class='text-yellow-400 underline'>base</span> of the mountain before climbing to the top.",
+                sentenceEnPlain: "The explorer set up a camp at the base of the mountain before climbing to the top.",
+                sentenceZh: "探險家在登上山頂之前，在山腳下建了營地。",
+                explain: "base (n.) 基部、底部、基礎、基地。"
+            },
+            {
+                word: "basement",
+                question: "Our house was flooded, and all the old books in the ______ got completely wet.",
+                options: ["balcony", "basement", "cage", "bank"],
+                answer: 1,
+                sentenceEn: "Our house was flooded, and all the old books in the <span class='text-yellow-400 underline'>basement</span> got completely wet.",
+                sentenceEnPlain: "Our house was flooded, and all the old books in the basement got completely wet.",
+                sentenceZh: "我們的房子被淹了，地下室裡所有的舊書都完全濕透了。",
+                explain: "basement (n.) 地下室。"
+            },
+            {
+                word: "basis",
+                question: "Understanding basic math is the ______ for learning advanced physics.",
+                options: ["basis", "battle", "belief", "course"],
+                answer: 0,
+                sentenceEn: "Understanding basic math is the <span class='text-yellow-400 underline'>basis</span> for learning advanced physics.",
+                sentenceEnPlain: "Understanding basic math is the basis for learning advanced physics.",
+                sentenceZh: "理解基礎數學是學習進階物理的基礎。",
+                explain: "basis (n.) 基礎、根據。複數形為 bases。"
+            },
+            {
+                word: "bathe",
+                question: "After playing in the mud, we had to ______ the dirty dog in the garden.",
+                options: ["babysit", "bathe", "carry", "chase"],
+                answer: 1,
+                sentenceEn: "After playing in the mud, we had to <span class='text-yellow-400 underline'>bathe</span> the dirty dog in the garden.",
+                sentenceEnPlain: "After playing in the mud, we had to bathe the dirty dog in the garden.",
+                sentenceZh: "在泥地裡玩耍後，我們不得不在花園裡給髒兮兮的狗洗澡。",
+                explain: "bathe (v.) 給...洗澡、沐浴。"
+            },
+            {
+                word: "battle",
+                question: "The army fought a historic ______ to defend their city from invaders.",
+                options: ["belief", "basis", "battle", "aid"],
+                answer: 2,
+                sentenceEn: "The army fought a historic <span class='text-yellow-400 underline'>battle</span> to defend their city from invaders.",
+                sentenceEnPlain: "The army fought a historic battle to defend their city from invaders.",
+                sentenceZh: "軍隊進行了一場歷史性的戰鬥，以防禦城市抵禦入侵者。",
+                explain: "battle (n.) 戰鬥、戰役。"
+            },
+            {
+                word: "bear",
+                question: "The injury was painful, but he tried his best to ______ the pain without crying.",
+                options: ["bend", "bind", "bear", "carry"],
+                answer: 2,
+                sentenceEn: "The injury was painful, but he tried his best to <span class='text-yellow-400 underline'>bear</span> the pain without crying.",
+                sentenceEnPlain: "The injury was painful, but he tried his best to bear the pain without crying.",
+                sentenceZh: "傷口很痛，但他盡最大努力忍受痛苦，沒有哭出來。",
+                explain: "bear (v.) 承擔、忍受（例：bear the pain）。過去式為 bore，過去分詞為 born。"
+            },
+            {
+                word: "belief",
+                question: "It is my firm ______ that everyone deserves a second chance to do things right.",
+                options: ["belief", "basis", "battle", "aid"],
+                answer: 0,
+                sentenceEn: "It is my firm <span class='text-yellow-400 underline'>belief</span> that everyone deserves a second chance to do things right.",
+                sentenceEnPlain: "It is my firm belief that everyone deserves a second chance to do things right.",
+                sentenceZh: "我堅定的信念是，每個人都應該有第二次機會把事情做好。",
+                explain: "belief (n.) 信念、看法。來自其動詞 believe。"
+            },
+            {
+                word: "beard",
+                question: "My uncle grew a thick ______ over the winter to keep his face warm.",
+                options: ["beard", "ankle", "bark", "bench"],
+                answer: 0,
+                sentenceEn: "My uncle grew a thick <span class='text-yellow-400 underline'>beard</span> over the winter to keep his face warm.",
+                sentenceEnPlain: "My uncle grew a thick beard over the winter to keep his face warm.",
+                sentenceZh: "我叔叔在冬天留了濃密的鬍鬚，以保持臉部溫暖。",
+                explain: "beard (n.) 鬍鬚（下巴與臉頰兩側的落腮鬍）。"
+            },
+            {
+                word: "bend",
+                question: "You have to ______ your knees when you jump down from a high place.",
+                options: ["bend", "bind", "bear", "carry"],
+                answer: 0,
+                sentenceEn: "You have to <span class='text-yellow-400 underline'>bend</span> your knees when you jump down from a high place.",
+                sentenceEnPlain: "You have to bend your knees when you jump down from a high place.",
+                sentenceZh: "當你從高處跳下時，你必須彎曲膝蓋。",
+                explain: "bend (v.) 彎曲、折彎。三態為 bend-bent-bent。"
+            },
+            {
+                word: "bench",
+                question: "We sat on a wooden ______ in the park to eat our sandwiches and rest.",
+                options: ["balcony", "basement", "bench", "cage"],
+                answer: 2,
+                sentenceEn: "We sat on a wooden <span class='text-yellow-400 underline'>bench</span> in the park to eat our sandwiches and rest.",
+                sentenceEnPlain: "We sat on a wooden bench in the park to eat our sandwiches and rest.",
+                sentenceZh: "我們坐在公園的木椅上吃三明治和休息。",
+                explain: "bench (n.) 長椅。"
+            },
+            {
+                word: "beyond",
+                question: "The beauty of the northern lights was ______ what words could describe.",
+                options: ["altogether", "directly", "anyhow", "beyond"],
+                answer: 3,
+                sentenceEn: "The beauty of the northern lights was <span class='text-yellow-400 underline'>beyond</span> what words could describe.",
+                sentenceEnPlain: "The beauty of the northern lights was beyond what words could describe.",
+                sentenceZh: "極光的美麗超越了言語所能形容的境界。",
+                explain: "beyond (prep.) 越過、超出...範圍。beyond description 意為無法言表。"
+            },
+            {
+                word: "bind",
+                question: "The nurse used a soft cloth to ______ the broken arm tightly to his body.",
+                options: ["bend", "bind", "bathe", "bear"],
+                answer: 1,
+                sentenceEn: "The nurse used a soft cloth to <span class='text-yellow-400 underline'>bind</span> the broken arm tightly to his body.",
+                sentenceEnPlain: "The nurse used a soft cloth to bind the broken arm tightly to his body.",
+                sentenceZh: "護士用一塊軟布將受傷斷裂的手臂緊緊綁在他的身體上。",
+                explain: "bind (v.) 綁、綑綁、包紮。三態為 bind-bound-bound。"
+            },
+            {
+                word: "blow up",
+                question: "The bad guy tried to ______ the bridge, but the police stopped him just in time.",
+                options: ["blow up", "cut off", "break off", "band together"],
+                answer: 0,
+                sentenceEn: "The bad guy tried to <span class='text-yellow-400 underline'>blow up</span> the bridge, but the police stopped him just in time.",
+                sentenceEnPlain: "The bad guy tried to blow up the bridge, but the police stopped him just in time.",
+                sentenceZh: "壞人企圖炸毀橋樑，但警方及時制止了他。",
+                explain: "blow up (phr.) 炸毀；充氣。"
+            },
+            {
+                word: "bony",
+                question: "After being lost in the forest for weeks, the cat was so ______ that we could feel its spine.",
+                options: ["certain", "common", "bony", "careless"],
+                answer: 2,
+                sentenceEn: "After being lost in the forest for weeks, the cat was so <span class='text-yellow-400 underline'>bony</span> that we could feel its spine.",
+                sentenceEnPlain: "After being lost in the forest for weeks, the cat was so bony that we could feel its spine.",
+                sentenceZh: "在森林裡迷路了幾個星期後，這隻貓瘦骨嶙峋，我們甚至能感覺到牠的脊椎骨。",
+                explain: "bony (adj.) 瘦骨嶙峋的、多骨的。來自名詞 bone。"
+            }
+        ];
+
+        // 🧠 狀態管理變數
+        let shuffledQuiz = [];
+        let currentIdx = 0;
+        let score = 0;
+        let streak = 0;
+        let correctCount = 0;
+        let ticketsEarned = 0; 
+        let unlockedGamesCount = 0; 
+        let lastAnsResult = null; 
+
+        // 🔢 題數選擇狀態
+        let selectedCount = 41; 
+
+        // 🏆 排行榜與 LocalStorage 配置
+        const STORAGE_KEY = "star_vocab_leaderboard_data_v2";
+        const SESSION_KEY = "star_vocab_active_session_v4"; // 升級時空密鑰以適配統計報告
+        const PREF_COUNT_KEY = "star_vocab_preferred_count";
+        
+        let stats = {
+            highScore: 0,
+            playCount: 0,
+            lastPlayed: ""
+        };
+
+        // 📊 本局統計分析專用狀態
+        let sessionStartTime = 0;
+        let sessionTimeTrack = []; // 紀錄每道題決策耗時
+        let sessionWrongWords = []; // 紀錄本局答錯或超時的單字
+        let totalAsteroidsSmashed = 0; // 本局擊碎隕石計數
+        let totalBossesDestroyed = 0;  // 本局擊沈 Boss 母艦計數
+
+        // ⏱️ 計時器變數
+        let timer = null;
+        let timeLeft = 20;
+
+        // 🎮 射擊遊戲核心配置
+        let shooterTimer = null;
+        let shooterTimeLeft = 30;
+        let shooterScore = 0;
+        let isShooterRunning = false;
+
+        // 🌌 背景粒子與煙火引擎
+        const bgCanvas = document.getElementById('bg-stars-canvas');
+        const bgCtx = bgCanvas.getContext('2d');
+        let bgStars = [];
+        let effectParticles = []; 
+
+        function resizeBgCanvas() {
+            bgCanvas.width = window.innerWidth;
+            bgCanvas.height = window.innerHeight;
+            initBgStars();
+        }
+
+        function initBgStars() {
+            bgStars = [];
+            const starCount = Math.floor((bgCanvas.width * bgCanvas.height) / 8000);
+            for (let i = 0; i < starCount; i++) {
+                bgStars.push({
+                    x: Math.random() * bgCanvas.width,
+                    y: Math.random() * bgCanvas.height,
+                    radius: Math.random() * 1.5 + 0.5,
+                    opacity: Math.random(),
+                    speed: Math.random() * 0.02 + 0.005
+                });
+            }
+        }
+
+        function triggerFireworksBurst(targetX, targetY, goldTheme = false) {
+            const particleColors = goldTheme 
+                ? ['#fbbf24', '#f59e0b', '#d97706', '#fef08a', '#ffffff', '#eab308'] 
+                : ['#f43f5e', '#3b82f6', '#eab308', '#10b981', '#a855f7', '#06b6d4', '#f97316'];
+            const count = goldTheme ? 60 : 45; 
+            
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * (goldTheme ? 10 : 8) + 3;
+                effectParticles.push({
+                    x: targetX,
+                    y: targetY,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed - (Math.random() * 3), 
+                    radius: Math.random() * 4 + 2,
+                    color: particleColors[Math.floor(Math.random() * particleColors.length)],
+                    opacity: 1,
+                    decay: Math.random() * 0.02 + 0.015,
+                    gravity: 0.12, 
+                    friction: 0.985 
+                });
+            }
+        }
+
+        function animateBgStars() {
+            bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+            
+            bgStars.forEach(star => {
+                star.opacity += star.speed;
+                if (star.opacity > 1 || star.opacity < 0) {
+                    star.speed = -star.speed;
+                }
+                bgCtx.fillStyle = `rgba(168, 85, 247, ${Math.max(0.1, star.opacity * 0.6)})`; 
+                bgCtx.beginPath();
+                bgCtx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+                bgCtx.fill();
+            });
+
+            effectParticles.forEach((p, pIdx) => {
+                p.vx *= p.friction;
+                p.vy *= p.friction;
+                p.vy += p.gravity;
+                p.x += p.vx;
+                p.y += p.vy;
+                p.opacity -= p.decay;
+
+                if (p.opacity <= 0) {
+                    effectParticles.splice(pIdx, 1);
+                } else {
+                    bgCtx.save();
+                    bgCtx.globalAlpha = p.opacity;
+                    bgCtx.shadowBlur = 10;
+                    bgCtx.shadowColor = p.color;
+                    bgCtx.fillStyle = p.color;
+                    bgCtx.beginPath();
+                    bgCtx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                    bgCtx.fill();
+                    bgCtx.restore();
+                }
+            });
+
+            requestAnimationFrame(animateBgStars);
+        }
+
+        // 📱 橫向螢幕偵測與管理
+        function checkOrientation() {
+            const alertEl = document.getElementById('landscape-alert');
+            if (window.innerHeight > window.innerWidth && window.innerWidth < 768) {
+                if (sessionStorage.getItem('landscapeDismissed') !== 'true') {
+                    alertEl.classList.remove('hidden');
+                    alertEl.classList.add('flex');
+                    setTimeout(() => alertEl.style.opacity = '1', 50);
+                }
+            } else {
+                alertEl.style.opacity = '0';
+                setTimeout(() => {
+                    alertEl.classList.add('hidden');
+                    alertEl.classList.remove('flex');
+                }, 300);
+            }
+        }
+
+        function dismissLandscapeAlert() {
+            sessionStorage.setItem('landscapeDismissed', 'true');
+            const alertEl = document.getElementById('landscape-alert');
+            alertEl.style.opacity = '0';
+            setTimeout(() => {
+                alertEl.classList.add('hidden');
+                alertEl.classList.remove('flex');
+            }, 300);
+        }
+
+        // 💾 排行與統計數據 LocalStorage 引擎
+        function loadStats() {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (raw) {
+                try {
+                    stats = JSON.parse(raw);
+                } catch(e) {
+                    console.log("儲存數據解析失敗，重設為預設值。");
+                }
+            }
+            updateStatsUI();
+
+            const prefCount = localStorage.getItem(PREF_COUNT_KEY);
+            if (prefCount) {
+                selectedCount = parseInt(prefCount, 10);
+            } else {
+                selectedCount = 41; 
+            }
+            updateQuestionCountUI();
+        }
+
+        function saveStats() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(stats));
+        }
+
+        function updateStatsUI() {
+            document.getElementById('start-high-score').innerText = stats.highScore.toLocaleString();
+            document.getElementById('start-play-count').innerText = stats.playCount;
+            const lastPlayedEl = document.getElementById('start-last-played');
+            if (stats.lastPlayed) {
+                lastPlayedEl.innerText = `上次挑戰: ${stats.lastPlayed}`;
+                lastPlayedEl.classList.remove('hidden');
+            } else {
+                lastPlayedEl.classList.add('hidden');
+            }
+        }
+
+        // 🔢 題數選擇視覺控制
+        function selectQuestionCount(count) {
+            selectedCount = count;
+            localStorage.setItem(PREF_COUNT_KEY, count);
+            updateQuestionCountUI();
+            playSound('tick');
+        }
+
+        function updateQuestionCountUI() {
+            const counts = [5, 10, 15, 30, 41];
+            counts.forEach(c => {
+                const btn = document.getElementById(`btn-count-${c}`);
+                if (btn) {
+                    if (c === selectedCount) {
+                        btn.className = "py-2 rounded-xl text-xs font-black border transition-all duration-300 bg-purple-600 border-purple-400 text-white shadow-lg shadow-purple-500/20";
+                    } else {
+                        btn.className = "py-2 rounded-xl text-xs font-black border transition-all duration-300 bg-slate-900 border-slate-800 text-slate-400 hover:border-purple-500/50 hover:text-purple-300";
+                    }
+                }
+            });
+        }
+
+        function recordNewAttempt() {
+            stats.playCount++;
+            const now = new Date();
+            stats.lastPlayed = `${now.getFullYear()}/${(now.getMonth()+1).toString().padStart(2,'0')}/${now.getDate().toString().padStart(2,'0')}`;
+            saveStats();
+            updateStatsUI();
+        }
+
+        function checkAndSetHighScore(currentScore) {
+            if (currentScore > stats.highScore) {
+                stats.highScore = currentScore;
+                saveStats();
+                updateStatsUI();
+                return true; 
+            }
+            return false;
+        }
+
+        function openConfirmModal() {
+            const modal = document.getElementById('modal-confirm');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            setTimeout(() => modal.classList.remove('opacity-0'), 50);
+        }
+
+        function closeConfirmModal() {
+            const modal = document.getElementById('modal-confirm');
+            modal.classList.add('opacity-0');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }, 300);
+        }
+
+        function executeResetStats() {
+            stats = {
+                highScore: 0,
+                playCount: 0,
+                lastPlayed: ""
+            };
+            saveStats();
+            updateStatsUI();
+            playSound('wrong');
+            closeConfirmModal();
+        }
+
+        // 💾 恢復存檔對話框控制
+        function checkSavedSession() {
+            const saved = localStorage.getItem(SESSION_KEY);
+            if (saved) {
+                try {
+                    const sessionData = JSON.parse(saved);
+                    if (sessionData && sessionData.currentIdx > 0 && sessionData.currentIdx < sessionData.shuffledQuiz.length) {
+                        document.getElementById('restore-progress').innerText = `${sessionData.currentIdx + 1} / ${sessionData.shuffledQuiz.length}`;
+                        const modal = document.getElementById('modal-restore-session');
+                        modal.classList.remove('hidden');
+                        modal.classList.add('flex');
+                        setTimeout(() => modal.classList.remove('opacity-0'), 50);
+                        return true;
+                    }
+                } catch(e) {
+                    console.log("時空存檔數據損毀，已自動清理。");
+                    localStorage.removeItem(SESSION_KEY);
+                }
+            }
+            return false;
+        }
+
+        function acceptSavedSession() {
+            const saved = localStorage.getItem(SESSION_KEY);
+            if (saved) {
+                try {
+                    const sessionData = JSON.parse(saved);
+                    shuffledQuiz = sessionData.shuffledQuiz;
+                    currentIdx = sessionData.currentIdx;
+                    score = sessionData.score;
+                    streak = sessionData.streak;
+                    correctCount = sessionData.correctCount;
+                    ticketsEarned = sessionData.ticketsEarned;
+                    unlockedGamesCount = sessionData.unlockedGamesCount;
+
+                    // 📊 同步恢復本局統計數據
+                    sessionStartTime = sessionData.sessionStartTime || Date.now();
+                    sessionTimeTrack = sessionData.sessionTimeTrack || [];
+                    sessionWrongWords = sessionData.sessionWrongWords || [];
+                    totalAsteroidsSmashed = sessionData.totalAsteroidsSmashed || 0;
+                    totalBossesDestroyed = sessionData.totalBossesDestroyed || 0;
+
+                    closeRestoreModal();
+                    document.getElementById('screen-start').classList.add('hidden');
+                    
+                    document.getElementById('global-score').innerText = score;
+                    if (streak >= 1) {
+                        document.getElementById('streak-badge').classList.remove('hidden');
+                        document.getElementById('streak-count').innerText = streak;
+                    } else {
+                        document.getElementById('streak-badge').classList.add('hidden');
+                    }
+                    updateTicketDisplay();
+
+                    const quizScreen = document.getElementById('screen-quiz');
+                    quizScreen.classList.remove('hidden');
+                    quizScreen.style.opacity = '1';
+
+                    playSound('unlock');
+                    loadQuestion();
+                } catch(e) {
+                    rejectSavedSession();
+                }
+            }
+        }
+
+        function rejectSavedSession() {
+            localStorage.removeItem(SESSION_KEY);
+            closeRestoreModal();
+            requestStart();
+        }
+
+        function closeRestoreModal() {
+            const modal = document.getElementById('modal-restore-session');
+            modal.classList.add('opacity-0');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }, 300);
+        }
+
+        function saveCurrentProgress() {
+            const sessionData = {
+                shuffledQuiz: shuffledQuiz,
+                currentIdx: currentIdx,
+                score: score,
+                streak: streak,
+                correctCount: correctCount,
+                ticketsEarned: ticketsEarned,
+                unlockedGamesCount: unlockedGamesCount,
+                // 📊 統計分析保存
+                sessionStartTime: sessionStartTime,
+                sessionTimeTrack: sessionTimeTrack,
+                sessionWrongWords: sessionWrongWords,
+                totalAsteroidsSmashed: totalAsteroidsSmashed,
+                totalBossesDestroyed: totalBossesDestroyed
+            };
+            localStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
+        }
+
+        function clearSavedProgress() {
+            localStorage.removeItem(SESSION_KEY);
+        }
+
+        // 🚀 初始化
+        window.onload = function() {
+            renderDictionary();
+            resizeBgCanvas();
+            animateBgStars();
+            loadStats(); 
+            
+            checkOrientation();
+            window.addEventListener('resize', () => {
+                resizeBgCanvas();
+                checkOrientation();
+            });
+
+            setTimeout(() => {
+                checkSavedSession();
+            }, 1000);
+        }
+
+        function shuffleArray(arr) {
+            return arr.sort(() => 0.5 - Math.random());
+        }
+
+        // 🟢 進入全螢幕並執行 3, 2, 1 倒數
+        function requestStart() {
+            const docElm = document.documentElement;
+            if (docElm.requestFullscreen) {
+                docElm.requestFullscreen().catch(err => console.log("無法全螢幕:", err));
+            } else if (docElm.webkitRequestFullscreen) {
+                docElm.webkitRequestFullscreen().catch(err => console.log("無法全螢幕:", err));
+            }
+
+            document.getElementById('screen-start').classList.add('hidden');
+            
+            runStartCountdown(() => {
+                recordNewAttempt();
+                startQuizTerm();
+            });
+        }
+
+        // 🎬 經典 3, 2, 1, GO! 倒數計時邏輯
+        function runStartCountdown(callback) {
+            const overlay = document.getElementById('screen-countdown');
+            const numberEl = document.getElementById('countdown-number');
+            overlay.classList.remove('hidden');
+            overlay.style.opacity = '1';
+
+            let count = 3;
+            numberEl.innerText = count;
+            
+            numberEl.className = "text-8xl sm:text-9xl font-black text-purple-400 font-orbitron scale-[2] opacity-0 transition-all duration-300 transform";
+            
+            setTimeout(() => {
+                numberEl.classList.remove('scale-[2]', 'opacity-0');
+                numberEl.classList.add('scale-100', 'opacity-100');
+                playSound('tick');
+            }, 50);
+
+            const countdownTimer = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    numberEl.innerText = count;
+                    numberEl.className = "text-8xl sm:text-9xl font-black text-purple-400 font-orbitron scale-[2] opacity-0";
+                    setTimeout(() => {
+                        numberEl.classList.remove('scale-[2]', 'opacity-0');
+                        numberEl.classList.add('scale-100', 'opacity-100');
+                        playSound('tick');
+                    }, 50);
+                } else if (count === 0) {
+                    numberEl.innerText = "GO!";
+                    numberEl.className = "text-8xl sm:text-9xl font-black text-cyan-400 font-orbitron scale-[2.5] opacity-0";
+                    setTimeout(() => {
+                        numberEl.classList.remove('scale-[2.5]', 'opacity-0');
+                        numberEl.classList.add('scale-100', 'opacity-100');
+                        playSound('tick-high');
+                    }, 50);
+                } else {
+                    clearInterval(countdownTimer);
+                    overlay.style.opacity = '0';
+                    setTimeout(() => {
+                        overlay.classList.add('hidden');
+                        callback();
+                    }, 300);
+                }
+            }, 1000);
+        }
+
+        // 開始搶答關卡
+        function startQuizTerm() {
+            const fullPool = shuffleArray([...quizDB]);
+            shuffledQuiz = fullPool.slice(0, selectedCount);
+
+            currentIdx = 0;
+            score = 0;
+            streak = 0;
+            correctCount = 0;
+            ticketsEarned = 0;
+            unlockedGamesCount = 0;
+
+            // 📊 重置本局專用數據報告
+            sessionStartTime = Date.now();
+            sessionTimeTrack = [];
+            sessionWrongWords = [];
+            totalAsteroidsSmashed = 0;
+            totalBossesDestroyed = 0;
+
+            document.getElementById('global-score').innerText = score;
+            document.getElementById('streak-badge').classList.add('hidden');
+            updateTicketDisplay();
+
+            document.getElementById('screen-victory').classList.add('hidden');
+            document.getElementById('new-record-banner').classList.add('hidden');
+            
+            const quizScreen = document.getElementById('screen-quiz');
+            quizScreen.classList.remove('hidden');
+            quizScreen.style.opacity = '1';
+
+            loadQuestion();
+        }
+
+        // 載入當前題目
+        function loadQuestion() {
+            timeLeft = 20;
+            document.getElementById('time-left').innerText = `${timeLeft}s`;
+            document.getElementById('time-left').className = "font-orbitron font-extrabold text-lg text-rose-400";
+            
+            const feedbackCard = document.getElementById('feedback-card');
+            feedbackCard.classList.add('hidden');
+            feedbackCard.style.opacity = '0'; 
+            
+            document.getElementById('options-panel').classList.remove('pointer-events-none', 'opacity-50');
+
+            const qData = shuffledQuiz[currentIdx];
+            document.getElementById('quiz-index-text').innerText = `${currentIdx + 1} / ${shuffledQuiz.length}`;
+            document.getElementById('question-prompt').innerText = qData.question;
+
+            qData.options.forEach((opt, i) => {
+                const btnText = document.getElementById(`opt-text-${i}`);
+                btnText.innerText = opt;
+                const btn = btnText.closest('button');
+                btn.className = getBtnDefaultClass(i);
+                btn.disabled = false;
+                
+                const icon = btn.querySelector('i');
+                if (i === 2) { 
+                    icon.className = "fa-regular fa-circle text-black/20 text-lg";
+                } else {
+                    icon.className = "fa-regular fa-circle text-white/40 text-lg";
+                }
+            });
+
+            saveCurrentProgress();
+
+            clearInterval(timer);
+            timer = setInterval(() => {
+                timeLeft--;
+                document.getElementById('time-left').innerText = `${timeLeft}s`;
+                playSound('tick');
+                
+                if (timeLeft <= 5) {
+                    document.getElementById('time-left').className = "font-orbitron font-extrabold text-xl text-red-500 animate-bounce";
+                }
+
+                if (timeLeft <= 0) {
+                    clearInterval(timer);
+                    handleTimeOut();
+                }
+            }, 1000);
+        }
+
+        function getBtnDefaultClass(idx) {
+            const base = "kahoot-btn w-full text-left p-5 sm:p-6 rounded-2xl flex items-center justify-between font-bold text-base sm:text-lg shadow-lg ";
+            if (idx === 0) return base + "bg-red-500 hover:bg-red-400 text-white shadow-red-500/10";
+            if (idx === 1) return base + "bg-blue-500 hover:bg-blue-400 text-white shadow-blue-500/10";
+            if (idx === 2) return base + "bg-yellow-500 hover:bg-yellow-400 text-slate-950 shadow-yellow-500/10";
+            return base + "bg-green-500 hover:bg-green-400 text-white shadow-green-500/10";
+        }
+
+        function triggerScreenShake() {
+            const container = document.getElementById('main-game-container');
+            container.classList.add('shake-active');
+            setTimeout(() => {
+                container.classList.remove('shake-active');
+            }, 450);
+        }
+
+        function triggerSuccessPulse() {
+            const container = document.getElementById('main-game-container');
+            container.classList.add('pulse-success-active');
+            setTimeout(() => {
+                container.classList.remove('pulse-success-active');
+            }, 600);
+        }
+
+        function handleOptionSelect(chosenIdx, event) {
+            clearInterval(timer);
+            const qData = shuffledQuiz[currentIdx];
+            const isCorrect = (chosenIdx === qData.answer);
+            
+            document.getElementById('options-panel').classList.add('pointer-events-none');
+            const buttons = document.getElementById('options-panel').getElementsByTagName('button');
+
+            qData.options.forEach((opt, i) => {
+                const btn = buttons[i];
+                btn.disabled = true;
+                if (i === qData.answer) {
+                    btn.className = "w-full text-left p-5 sm:p-6 rounded-2xl flex items-center justify-between font-bold text-base sm:text-lg bg-emerald-500 text-white border-2 border-emerald-300";
+                    btn.querySelector('i').className = "fa-solid fa-circle-check text-white text-lg";
+                } else if (i === chosenIdx) {
+                    btn.className = "w-full text-left p-5 sm:p-6 rounded-2xl flex items-center justify-between font-bold text-base sm:text-lg bg-rose-600 text-white border-2 border-rose-400";
+                    btn.querySelector('i').className = "fa-solid fa-circle-xmark text-white text-lg";
+                } else {
+                    btn.className = "w-full text-left p-5 sm:p-6 rounded-2xl flex items-center justify-between font-bold text-base sm:text-lg bg-slate-900 text-slate-600 border border-slate-950 opacity-40";
+                    btn.querySelector('i').className = "fa-regular fa-circle text-transparent";
+                }
+            });
+
+            let burstX = window.innerWidth / 2;
+            let burstY = window.innerHeight / 2 - 100;
+            if (event && event.clientX && event.clientY) {
+                burstX = event.clientX;
+                burstY = event.clientY;
+            }
+
+            showAnswerFeedback(isCorrect, false, burstX, burstY);
+        }
+
+        function handleTimeOut() {
+            clearInterval(timer);
+            document.getElementById('options-panel').classList.add('pointer-events-none');
+            const qData = shuffledQuiz[currentIdx];
+            const buttons = document.getElementById('options-panel').getElementsByTagName('button');
+
+            qData.options.forEach((opt, i) => {
+                const btn = buttons[i];
+                btn.disabled = true;
+                if (i === qData.answer) {
+                    btn.className = "w-full text-left p-5 sm:p-6 rounded-2xl flex items-center justify-between font-bold text-base sm:text-lg bg-emerald-500 text-white border-2 border-emerald-300";
+                    btn.querySelector('i').className = "fa-solid fa-circle-check text-white text-lg";
+                } else {
+                    btn.className = "w-full text-left p-5 sm:p-6 rounded-2xl flex items-center justify-between font-bold text-base sm:text-lg bg-slate-900 text-slate-600 border border-slate-950 opacity-40";
+                    btn.querySelector('i').className = "fa-regular fa-circle text-transparent";
+                }
+            });
+
+            showAnswerFeedback(false, true);
+        }
+
+        function showAnswerFeedback(isCorrect, isTimeout = false, burstX = null, burstY = null) {
+            const feedbackCard = document.getElementById('feedback-card');
+            const badgeIcon = document.getElementById('feedback-badge-icon');
+            const title = document.getElementById('feedback-title');
+            const qData = shuffledQuiz[currentIdx];
+
+            feedbackCard.classList.remove('hidden');
+            setTimeout(() => feedbackCard.style.opacity = '1', 50);
+            lastAnsResult = isCorrect;
+
+            document.getElementById('feedback-sentence-en').innerHTML = qData.sentenceEn;
+            document.getElementById('feedback-sentence-zh').innerText = qData.sentenceZh;
+            document.getElementById('feedback-rationale-text').innerText = qData.explain;
+
+            // 📊 戰績反應反應速度記錄 (20秒減去剩餘時間)
+            const reactionTime = 20 - timeLeft;
+            sessionTimeTrack.push(reactionTime);
+
+            if (isCorrect) {
+                correctCount++;
+                streak++;
+                ticketsEarned++; 
+
+                const multiplier = Math.min(2.0, 1.0 + (streak * 0.1)).toFixed(1);
+                
+                if (streak >= 2) {
+                    playSound('combo', streak);
+                } else {
+                    playSound('correct');
+                }
+
+                triggerSuccessPulse();
+                if (burstX !== null && burstY !== null) {
+                    triggerFireworksBurst(burstX, burstY);
+                    triggerFireworksBurst(window.innerWidth / 2, 80);
+                } else {
+                    triggerFireworksBurst(window.innerWidth / 2, window.innerHeight / 2);
+                }
+                
+                const speedBonus = timeLeft * 40;
+                const baseGained = 1000 + speedBonus;
+                const finalGained = Math.floor(baseGained * parseFloat(multiplier));
+                score += finalGained;
+
+                badgeIcon.className = "w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-sm border border-emerald-500/20";
+                badgeIcon.innerHTML = `<i class="fa-solid fa-check"></i>`;
+                title.innerText = `搶答成功！ +${finalGained} 分 (倍率 ${multiplier}x)`;
+                title.className = "font-black text-emerald-400 text-lg";
+
+                const multiplierTag = document.getElementById('multiplier-tag');
+                multiplierTag.innerText = `${multiplier}x`;
+                if (parseFloat(multiplier) >= 1.5) {
+                    multiplierTag.className = "bg-red-500 text-white px-1.5 py-0.5 rounded text-[9px] font-black leading-none animate-bounce";
+                } else {
+                    multiplierTag.className = "bg-orange-500 text-slate-950 px-1.5 py-0.5 rounded text-[9px] font-black leading-none";
+                }
+
+                speakEng(qData.sentenceEnPlain);
+
+            } else {
+                playSound('wrong');
+                triggerScreenShake();
+                streak = 0; 
+
+                // 📊 錯題弱點分析記錄
+                if (!sessionWrongWords.some(item => item.word === qData.word)) {
+                    sessionWrongWords.push({
+                        word: qData.word,
+                        explain: qData.explain
+                    });
+                }
+
+                badgeIcon.className = "w-8 h-8 rounded-full bg-rose-500/10 text-rose-400 flex items-center justify-center text-sm border border-rose-500/20";
+                badgeIcon.innerHTML = `<i class="fa-solid fa-xmark"></i>`;
+                title.innerText = isTimeout ? "搶答逾時了！" : "搶答失敗，再接再厲！";
+                title.className = "font-black text-rose-400 text-lg";
+            }
+
+            document.getElementById('global-score').innerText = score;
+            
+            const streakBadge = document.getElementById('streak-badge');
+            if (streak >= 1) {
+                streakBadge.classList.remove('hidden');
+                document.getElementById('streak-count').innerText = streak;
+            } else {
+                streakBadge.classList.add('hidden');
+            }
+
+            saveCurrentProgress();
+            updateTicketDisplay();
+        }
+
+        function updateTicketDisplay() {
+            const displays = ['ticket-progress-text', 'mini-ticket-text'];
+            displays.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.innerText = `${ticketsEarned} / 5`;
+                    if (ticketsEarned >= 5) {
+                        el.className = "text-yellow-400 font-extrabold animate-pulse text-sm sm:text-base";
+                    } else {
+                        el.className = "text-cyan-400 text-sm font-black";
+                    }
+                }
+            });
+        }
+
+        function speakCorrectExample() {
+            const qData = shuffledQuiz[currentIdx];
+            speakEng(qData.sentenceEnPlain);
+        }
+
+        function goToNextStep() {
+            if (ticketsEarned >= 5) {
+                ticketsEarned = 0; 
+                updateTicketDisplay();
+                unlockedGamesCount++;
+                saveCurrentProgress(); 
+                triggerShooterReward(); 
+                return;
+            }
+            proceedToNextQuiz();
+        }
+
+        function proceedToNextQuiz() {
+            if (currentIdx < shuffledQuiz.length - 1) {
+                currentIdx++;
+                loadQuestion();
+            } else {
+                showFinalVictoryScreen();
+            }
+        }
+
+        // 🏆 終局！生成深度戰績分析報告
+        function showFinalVictoryScreen() {
+            clearSavedProgress();
+
+            document.getElementById('screen-quiz').classList.add('hidden');
+            document.getElementById('screen-game').classList.add('hidden');
+            
+            const victoryScreen = document.getElementById('screen-victory');
+            victoryScreen.classList.remove('hidden');
+            setTimeout(() => victoryScreen.style.opacity = '1', 50);
+
+            // 1. 基本數值渲染
+            document.getElementById('report-total-score').innerText = score.toLocaleString();
+            document.getElementById('report-games-played').innerText = unlockedGamesCount + " 次";
+
+            // 2. 正確率與進度計算
+            const accVal = Math.round((correctCount / shuffledQuiz.length) * 100);
+            document.getElementById('report-accuracy').innerText = `${accVal}%`;
+            if (accVal >= 80) {
+                document.getElementById('report-accuracy').className = "text-emerald-400 text-base font-orbitron";
+            } else if (accVal >= 60) {
+                document.getElementById('report-accuracy').className = "text-yellow-400 text-base font-orbitron";
+            } else {
+                document.getElementById('report-accuracy').className = "text-rose-500 text-base font-orbitron";
+            }
+
+            // 3. 平均答題反應時間
+            const totalReaction = sessionTimeTrack.reduce((a, b) => a + b, 0);
+            const avgReaction = (sessionTimeTrack.length > 0 ? (totalReaction / sessionTimeTrack.length) : 0).toFixed(1);
+            document.getElementById('report-speed').innerText = `${avgReaction}s / 題`;
+
+            // 4. 太空小遊戲防禦總擊落戰果
+            document.getElementById('report-asteroids').innerText = totalAsteroidsSmashed;
+            document.getElementById('report-bosses').innerText = totalBossesDestroyed;
+
+            // 5. 評定航行等級 S, A, B, C
+            const rankEl = document.getElementById('report-rank');
+            const rankTextEl = document.getElementById('report-rank-text');
+            if (accVal >= 90) {
+                rankEl.innerText = "S";
+                rankEl.className = "text-6xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-amber-500 font-orbitron my-2 drop-shadow-[0_0_15px_rgba(245,158,11,0.3)] animate-pulse";
+                rankTextEl.innerText = "超星系主宰";
+                rankTextEl.className = "text-xs text-yellow-400 font-black tracking-widest";
+            } else if (accVal >= 75) {
+                rankEl.innerText = "A";
+                rankEl.className = "text-6xl font-black text-transparent bg-clip-text bg-gradient-to-b from-cyan-300 to-indigo-500 font-orbitron my-2";
+                rankTextEl.innerText = "星圈衛士";
+                rankTextEl.className = "text-xs text-cyan-400 font-bold tracking-widest";
+            } else if (accVal >= 60) {
+                rankEl.innerText = "B";
+                rankEl.className = "text-6xl font-black text-transparent bg-clip-text bg-gradient-to-b from-purple-300 to-indigo-400 font-orbitron my-2";
+                rankTextEl.innerText = "探索先鋒";
+                rankTextEl.className = "text-xs text-purple-300 font-bold tracking-widest";
+            } else {
+                rankEl.innerText = "C";
+                rankEl.className = "text-6xl font-black text-transparent bg-clip-text bg-gradient-to-b from-slate-400 to-slate-500 font-orbitron my-2";
+                rankTextEl.innerText = "基礎航員";
+                rankTextEl.className = "text-xs text-slate-400 font-bold tracking-widest";
+            }
+
+            // 6. 弱點錯題動態清單渲染
+            const wrongSection = document.getElementById('wrong-questions-section');
+            const wrongList = document.getElementById('wrong-questions-list');
+            wrongList.innerHTML = '';
+            
+            if (sessionWrongWords.length > 0) {
+                wrongSection.classList.remove('hidden');
+                sessionWrongWords.forEach(item => {
+                    const el = document.createElement('div');
+                    el.className = "flex items-center justify-between gap-3 p-2.5 bg-slate-900 border border-slate-800 rounded-xl";
+                    el.innerHTML = `
+                        <div class="flex-grow">
+                            <strong class="text-slate-100 text-xs font-bold block">${item.word}</strong>
+                            <p class="text-[11px] text-slate-400 leading-normal">${item.explain}</p>
+                        </div>
+                        <button onclick="speakEng('${item.word}')" class="w-7 h-7 rounded-full bg-slate-950 hover:bg-purple-950 text-slate-500 hover:text-purple-400 flex items-center justify-center border border-slate-800 shrink-0 transition-colors">
+                            <i class="fa-solid fa-volume-high text-[10px]"></i>
+                        </button>
+                    `;
+                    wrongList.appendChild(el);
+                });
+            } else {
+                wrongSection.classList.add('hidden');
+            }
+
+            // 💾 儲存並檢查是否突破歷史紀錄
+            const newRecordGained = checkAndSetHighScore(score);
+            const banner = document.getElementById('new-record-banner');
+            
+            if (newRecordGained) {
+                banner.classList.remove('hidden');
+                setTimeout(() => {
+                    triggerFireworksBurst(window.innerWidth / 2, window.innerHeight / 2, true);
+                    triggerFireworksBurst(window.innerWidth / 4, window.innerHeight / 2, true);
+                    triggerFireworksBurst(3 * window.innerWidth / 4, window.innerHeight / 2, true);
+                }, 300);
+            } else {
+                banner.classList.add('hidden');
+            }
+
+            playSound('unlock');
+        }
+
+        function restartAll() {
+            clearSavedProgress();
+            requestStart();
+        }
+
+
+        // 🌌 ===================================================
+        // 🎁 太空防禦戰 (HP, 武器升級與 BOSS 大改版)
+        // ===================================================
+        const canvas = document.getElementById('shooter-canvas');
+        const ctx = canvas.getContext('2d');
+        
+        let player = { 
+            x: 150, 
+            y: 320, 
+            width: 32, 
+            height: 32, 
+            speed: 6.5,
+            hp: 3,        
+            maxHp: 3,
+            weapon: 'normal' 
+        };
+        
+        let bullets = [];
+        let enemyBullets = []; 
+        let asteroids = [];
+        let powerups = [];     
+        let particles = [];
+        let gameScore = 0;
+        let keys = {};
+        let touchStartX = 0;
+
+        let boss = null;
+        let bossSpawned = false;
+
+        function resizeCanvas() {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+            player.x = canvas.width / 2 - player.width / 2;
+            player.y = canvas.height - 45;
+        }
+
+        function updateHPDisplay() {
+            const hearts = "🛡️ ".repeat(player.hp) + "░ ".repeat(player.maxHp - player.hp);
+            document.getElementById('game-hp-stars').innerText = hearts;
+            if (player.hp === 1) {
+                document.getElementById('game-hp-stars').className = "text-rose-500 animate-pulse text-base";
+            } else {
+                document.getElementById('game-hp-stars').className = "text-cyan-400 text-base";
+            }
+        }
+
+        function updateWeaponBadge() {
+            const badge = document.getElementById('game-weapon-badge');
+            if (player.weapon === 'normal') {
+                badge.innerText = "標準雷射";
+                badge.className = "bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 px-2 py-0.5 rounded text-[10px] font-black";
+            } else if (player.weapon === 'spread') {
+                badge.innerText = "三叉擴散雷射";
+                badge.className = "bg-yellow-500/20 text-yellow-300 border border-yellow-400/30 px-2 py-0.5 rounded text-[10px] font-black animate-pulse";
+            } else if (player.weapon === 'cannon') {
+                badge.innerText = "重離子軌道砲";
+                badge.className = "bg-red-500/20 text-red-300 border border-red-400/30 px-2 py-0.5 rounded text-[10px] font-black animate-pulse";
+            }
+        }
+
+        function triggerShooterReward() {
+            document.getElementById('screen-quiz').classList.add('hidden');
+            
+            const gameScreen = document.getElementById('screen-game');
+            gameScreen.classList.remove('hidden');
+            setTimeout(() => gameScreen.style.opacity = '1', 50);
+            
+            gameScore = 0;
+            shooterTimeLeft = 30;
+            bullets = [];
+            enemyBullets = [];
+            asteroids = [];
+            powerups = [];
+            particles = [];
+            
+            boss = null;
+            bossSpawned = false;
+
+            player.hp = 3;
+            player.weapon = 'normal';
+            updateHPDisplay();
+            updateWeaponBadge();
+
+            document.getElementById('game-score').innerText = gameScore;
+            document.getElementById('game-timer').innerText = `${shooterTimeLeft}s`;
+            document.getElementById('game-title-text').innerHTML = `<i class="fa-solid fa-shield-halved mr-1 text-cyan-400 animate-pulse"></i> 太空防禦戰 (一般空域)`;
+
+            playSound('unlock');
+            resizeCanvas();
+
+            window.addEventListener('keydown', handleKeyDown);
+            window.addEventListener('keyup', handleKeyUp);
+            canvas.addEventListener('touchstart', handleTouchStart, { passive: true });
+            canvas.addEventListener('touchmove', handleTouchMove, { passive: true });
+
+            isShooterRunning = true;
+            requestAnimationFrame(updateShooter);
+
+            clearInterval(shooterTimer);
+            shooterTimer = setInterval(() => {
+                shooterTimeLeft--;
+                document.getElementById('game-timer').innerText = `${shooterTimeLeft}s`;
+                
+                if (shooterTimeLeft === 15 && !bossSpawned) {
+                    spawnBoss母艦();
+                }
+
+                if (shooterTimeLeft <= 0) {
+                    endShooterGame();
+                }
+            }, 1000);
+        }
+
+        function spawnBoss母艦() {
+            bossSpawned = true;
+            playSound('boss-alert');
+            document.getElementById('game-title-text').innerHTML = `<span class="text-rose-500 font-black animate-pulse uppercase tracking-wider"><i class="fa-solid fa-triangle-exclamation mr-1"></i> BOSS 來襲：星際母艦 <i class="fa-solid fa-radiation"></i></span>`;
+            
+            boss = {
+                x: canvas.width / 2 - 40,
+                y: -60,
+                width: 80,
+                height: 40,
+                hp: 35,
+                maxHp: 35,
+                vx: 2,
+                lastShot: 0
+            };
+        }
+
+        function handleKeyDown(e) {
+            keys[e.code] = true;
+            if (e.code === 'Space') {
+                e.preventDefault(); 
+            }
+        }
+        function handleKeyUp(e) {
+            keys[e.code] = false;
+        }
+
+        function handleTouchStart(e) {
+            touchStartX = e.touches[0].clientX;
+        }
+        function handleTouchMove(e) {
+            const touchX = e.touches[0].clientX;
+            const diff = touchX - touchStartX;
+            player.x += diff * 1.5; 
+            touchStartX = touchX;
+
+            if (player.x < 0) player.x = 0;
+            if (player.x > canvas.width - player.width) player.x = canvas.width - player.width;
+        }
+
+        function createExplosion(x, y, color) {
+            playSound('explode');
+            for (let i = 0; i < 15; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 8,
+                    vy: (Math.random() - 0.5) * 8,
+                    radius: Math.random() * 3.5 + 1.5,
+                    alpha: 1,
+                    decay: Math.random() * 0.04 + 0.02,
+                    color: color
+                });
+            }
+        }
+
+        let lastShotTime = 0;
+        function updateShooter(timestamp) {
+            if (!isShooterRunning) return;
+
+            ctx.fillStyle = '#020617';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.strokeStyle = 'rgba(6, 182, 212, 0.05)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < canvas.height; i += 40) {
+                ctx.beginPath();
+                ctx.moveTo(0, i);
+                ctx.lineTo(canvas.width, i);
+                ctx.stroke();
+            }
+
+            if (keys['ArrowLeft'] || keys['KeyA']) {
+                player.x = Math.max(0, player.x - player.speed);
+            }
+            if (keys['ArrowRight'] || keys['KeyD']) {
+                player.x = Math.min(canvas.width - player.width, player.x + player.speed);
+            }
+
+            if (timestamp - lastShotTime > 150) {
+                if (player.weapon === 'normal') {
+                    bullets.push({ x: player.x + player.width / 2 - 2, y: player.y, vx: 0, vy: -11, width: 4, height: 12, color: '#fb7185', power: 1 });
+                    playSound('laser');
+                } else if (player.weapon === 'spread') {
+                    bullets.push({ x: player.x + player.width / 2 - 2, y: player.y, vx: 0, vy: -11, width: 4, height: 12, color: '#f59e0b', power: 1 });
+                    bullets.push({ x: player.x + player.width / 2 - 6, y: player.y, vx: -3, vy: -10, width: 4, height: 12, color: '#f59e0b', power: 1 });
+                    bullets.push({ x: player.x + player.width / 2 + 2, y: player.y, vx: 3, vy: -10, width: 4, height: 12, color: '#f59e0b', power: 1 });
+                    playSound('laser');
+                } else if (player.weapon === 'cannon') {
+                    bullets.push({ x: player.x + player.width / 2 - 6, y: player.y, vx: 0, vy: -14, width: 12, height: 24, color: '#ef4444', power: 3 });
+                    playSound('shock');
+                }
+                lastShotTime = timestamp;
+            }
+
+            ctx.fillStyle = '#22d3ee'; 
+            ctx.beginPath();
+            ctx.moveTo(player.x + player.width / 2, player.y);
+            ctx.lineTo(player.x, player.y + player.height);
+            ctx.lineTo(player.x + player.width, player.y + player.height);
+            ctx.closePath();
+            ctx.fill();
+            
+            ctx.fillStyle = '#f43f5e';
+            ctx.fillRect(player.x + player.width / 2 - 4, player.y + player.height, 8, 4);
+
+            bullets.forEach((bullet, index) => {
+                bullet.x += bullet.vx;
+                bullet.y += bullet.vy;
+                ctx.fillStyle = bullet.color;
+                ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+                if (bullet.y < -20 || bullet.x < -10 || bullet.x > canvas.width + 10) {
+                    bullets.splice(index, 1);
+                }
+            });
+
+            if (boss) {
+                boss.x += boss.vx;
+                if (boss.x <= 10 || boss.x + boss.width >= canvas.width - 10) {
+                    boss.vx = -boss.vx;
+                }
+                if (boss.y < 50) {
+                    boss.y += 1.5;
+                }
+
+                if (timestamp - boss.lastShot > 600) {
+                    enemyBullets.push({
+                        x: boss.x + boss.width / 2 - 3,
+                        y: boss.y + boss.height,
+                        vx: (player.x + player.width/2 - (boss.x + boss.width/2)) / 80, 
+                        vy: 4,
+                        size: 6,
+                        color: '#a855f7'
+                    });
+                    boss.lastShot = timestamp;
+                }
+
+                ctx.fillStyle = '#1e1b4b'; 
+                ctx.fillRect(boss.x, boss.y, boss.width, boss.height - 10);
+                ctx.fillStyle = '#818cf8'; 
+                ctx.fillRect(boss.x + 10, boss.y + boss.height - 10, boss.width - 20, 10);
+                
+                ctx.fillStyle = '#f43f5e';
+                ctx.beginPath();
+                ctx.arc(boss.x + boss.width / 2, boss.y + boss.height / 2, 8, 0, Math.PI * 2);
+                ctx.fill();
+
+                const hpPercent = boss.hp / boss.maxHp;
+                ctx.fillStyle = 'rgba(244, 63, 94, 0.2)';
+                ctx.fillRect(boss.x - 10, boss.y - 15, boss.width + 20, 5);
+                ctx.fillStyle = '#f43f5e';
+                ctx.fillRect(boss.x - 10, boss.y - 15, (boss.width + 20) * hpPercent, 5);
+            }
+
+            enemyBullets.forEach((eb, ebIdx) => {
+                eb.x += eb.vx;
+                eb.y += eb.vy;
+                ctx.fillStyle = eb.color;
+                ctx.beginPath();
+                ctx.arc(eb.x, eb.y, eb.size, 0, Math.PI * 2);
+                ctx.fill();
+
+                if (eb.y > canvas.height + 10) {
+                    enemyBullets.splice(ebIdx, 1);
+                }
+
+                const distPlayer = Math.hypot((eb.x - (player.x + player.width / 2)), (eb.y - (player.y + player.height / 2)));
+                if (distPlayer < eb.size + player.width / 2) {
+                    enemyBullets.splice(ebIdx, 1);
+                    damagePlayerShield();
+                }
+            });
+
+            if (Math.random() < 0.045 && (!boss || Math.random() < 0.02)) {
+                const rand = Math.random();
+                if (rand < 0.70) {
+                    asteroids.push({
+                        type: 'normal',
+                        x: Math.random() * (canvas.width - 30),
+                        y: -30,
+                        size: Math.random() * 20 + 15,
+                        speed: Math.random() * 2 + 1.5,
+                        color: `hsl(${Math.random() * 60 + 260}, 70%, 50%)` 
+                    });
+                } else {
+                    asteroids.push({
+                        type: 'comet',
+                        x: Math.random() * (canvas.width - 20),
+                        y: -30,
+                        size: 14,
+                        speed: Math.random() * 2 + 4, 
+                        color: '#f43f5e'
+                    });
+                }
+            }
+
+            asteroids.forEach((ast, aIdx) => {
+                ast.y += ast.speed;
+                
+                ctx.fillStyle = ast.color;
+                ctx.beginPath();
+                ctx.arc(ast.x + ast.size / 2, ast.y + ast.size / 2, ast.size / 2, 0, Math.PI * 2);
+                ctx.fill();
+
+                if (ast.y > canvas.height) {
+                    asteroids.splice(aIdx, 1);
+                    if (ast.type === 'comet') {
+                        gameScore = Math.max(0, gameScore - 100);
+                        document.getElementById('game-score').innerText = gameScore;
+                    }
+                }
+
+                const distToPlayer = Math.hypot((ast.x + ast.size/2 - (player.x + player.width/2)), (ast.y + ast.size/2 - (player.y + player.height/2)));
+                if (distToPlayer < (ast.size/2 + player.width/2 - 4)) {
+                    createExplosion(ast.x + ast.size/2, ast.y + ast.size/2, ast.color);
+                    asteroids.splice(aIdx, 1);
+                    damagePlayerShield();
+                }
+
+                bullets.forEach((bullet, bIdx) => {
+                    const dist = Math.hypot((bullet.x - (ast.x + ast.size / 2)), (bullet.y - (ast.y + ast.size / 2)));
+                    if (dist < ast.size / 2 + 6) {
+                        createExplosion(ast.x + ast.size / 2, ast.y + ast.size / 2, ast.color);
+                        
+                        if (Math.random() < 0.18) {
+                            spawnPowerup(ast.x + ast.size/2, ast.y + ast.size/2);
+                        }
+
+                        asteroids.splice(aIdx, 1);
+                        bullets.splice(bIdx, 1);
+                        
+                        const points = ast.type === 'comet' ? 250 : 100;
+                        gameScore += points;
+                        score += Math.floor(points / 2); 
+                        
+                        // 📊 計算隕石擊毀總量
+                        totalAsteroidsSmashed++;
+
+                        document.getElementById('global-score').innerText = score;
+                        document.getElementById('game-score').innerText = gameScore;
+                    }
+                });
+            });
+
+            if (boss) {
+                bullets.forEach((bullet, bIdx) => {
+                    if (bullet.x > boss.x && bullet.x < boss.x + boss.width &&
+                        bullet.y > boss.y && bullet.y < boss.y + boss.height) {
+                        
+                        bullets.splice(bIdx, 1);
+                        boss.hp -= bullet.power;
+                        createExplosion(bullet.x, bullet.y, '#f43f5e');
+
+                        if (boss.hp <= 0) {
+                            createExplosion(boss.x + boss.width/2, boss.y + boss.height/2, '#eab308');
+                            createExplosion(boss.x + 20, boss.y + 10, '#f97316');
+                            createExplosion(boss.x + 60, boss.y + 10, '#3b82f6');
+                            
+                            boss = null;
+                            const bossBonus = 2500;
+                            gameScore += bossBonus;
+                            score += 1000; 
+                            
+                            // 📊 計算旗艦擊沉數量
+                            totalBossesDestroyed++;
+
+                            document.getElementById('global-score').innerText = score;
+                            document.getElementById('game-score').innerText = gameScore;
+                            
+                            document.getElementById('game-title-text').innerHTML = `<span class="text-yellow-400 font-extrabold tracking-widest animate-bounce"><i class="fa-solid fa-crown mr-1"></i> 旗艦擊沉！獲得大幅積分加成</span>`;
+                        }
+                    }
+                });
+            }
+
+            powerups.forEach((pu, puIdx) => {
+                pu.y += 2.5; 
+                
+                ctx.save();
+                ctx.shadowBlur = 12;
+                ctx.shadowColor = pu.color;
+                ctx.fillStyle = pu.color;
+                ctx.beginPath();
+                ctx.arc(pu.x, pu.y, 7, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+
+                if (pu.y > canvas.height + 15) {
+                    powerups.splice(puIdx, 1);
+                }
+
+                const distToPlayer = Math.hypot((pu.x - (player.x + player.width/2)), (pu.y - (player.y + player.height/2)));
+                if (distToPlayer < (7 + player.width/2)) {
+                    powerups.splice(puIdx, 1);
+                    playSound('powerup');
+                    applyPowerupEffect(pu.type);
+                }
+            });
+
+            particles.forEach((p, pIdx) => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.alpha -= p.decay;
+                if (p.alpha <= 0) {
+                    particles.splice(pIdx, 1);
+                } else {
+                    ctx.save();
+                    ctx.globalAlpha = p.alpha;
+                    ctx.fillStyle = p.color;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+            });
+
+            requestAnimationFrame(updateShooter);
+        }
+
+        function spawnPowerup(x, y) {
+            const rand = Math.random();
+            let chosenType = 'spread';
+            let color = '#fbbf24'; 
+            
+            if (rand < 0.4) {
+                chosenType = 'spread';
+            } else if (rand < 0.7) {
+                chosenType = 'cannon';
+                color = '#ef4444'; 
+            } else {
+                chosenType = 'shield';
+                color = '#10b981'; 
+            }
+
+            powerups.push({ x: x, y: y, type: chosenType, color: color });
+        }
+
+        function applyPowerupEffect(type) {
+            if (type === 'shield') {
+                if (player.hp < player.maxHp) {
+                    player.hp++;
+                    updateHPDisplay();
+                }
+            } else {
+                player.weapon = type;
+                updateWeaponBadge();
+            }
+        }
+
+        function damagePlayerShield() {
+            playSound('wrong');
+            triggerScreenShake();
+            player.hp--;
+            updateHPDisplay();
+
+            if (player.hp <= 0) {
+                endShooterGame();
+            }
+        }
+
+        function endShooterGame() {
+            isShooterRunning = false;
+            clearInterval(shooterTimer);
+
+            window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('keyup', handleKeyUp);
+            canvas.removeEventListener('touchstart', handleTouchStart);
+            canvas.removeEventListener('touchmove', handleTouchMove);
+
+            document.getElementById('screen-game').classList.add('hidden');
+            document.getElementById('screen-quiz').classList.remove('hidden');
+
+            proceedToNextQuiz();
+        }
+
+
+        // 📚 動態字典清單
+        function renderDictionary() {
+            const grid = document.getElementById('quick-dict-grid');
+            grid.innerHTML = '';
+
+            quizDB.forEach(item => {
+                const card = document.createElement('div');
+                card.className = "bg-slate-900 border border-slate-950 p-4 rounded-xl flex items-center justify-between gap-3 shadow-md";
+                card.innerHTML = `
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <strong class="text-sm font-extrabold text-slate-100">${item.word}</strong>
+                        </div>
+                        <p class="text-xs text-slate-400 leading-relaxed mt-1">${item.explain}</p>
+                    </div>
+                    <button onclick="speakEng('${item.word}')" class="w-8 h-8 rounded-full bg-slate-950 text-slate-400 hover:text-purple-400 flex items-center justify-center shrink-0 border border-slate-900 transition-colors">
+                        <i class="fa-solid fa-volume-high text-xs"></i>
+                    </button>
+                `;
+                grid.appendChild(card);
+            });
+        }
+    </script>
+</body>
+</html>
+
+```
