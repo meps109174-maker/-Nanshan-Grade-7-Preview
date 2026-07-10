@@ -104,10 +104,14 @@
 
     <!-- 🔊 網頁原生音效合成器與 TTS 引擎 -->
     <script>
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        // 🧬 修正：將 AudioContext 的建立改為懶加載，避免頁面初次載入時在多數瀏覽器引發安全政策警告
+        let audioCtx = null;
         
         function playSound(type, optionVal = 0) {
             try {
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
                 if (audioCtx.state === 'suspended') {
                     audioCtx.resume();
                 }
@@ -269,6 +273,30 @@
                 </button>
                 <button onclick="acceptSavedSession()" class="bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-extrabold py-2.5 px-4 rounded-xl text-xs transition-colors shadow-lg shadow-cyan-600/20">
                     加載並繼續
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ⚠️ Minecraft 行動端硬體限制提示對話框 -->
+    <div id="modal-mc-restrict" class="hidden fixed inset-0 bg-slate-950/90 z-[210] flex flex-col items-center justify-center p-4 screen-fade opacity-0">
+        <div class="bg-slate-900 border border-emerald-500/40 rounded-3xl p-6 max-w-sm w-full text-center space-y-4 shadow-2xl">
+            <div class="w-12 h-12 bg-emerald-500/10 rounded-full flex items-center justify-center text-emerald-400 text-xl mx-auto">
+                <i class="fa-solid fa-desktop animate-bounce"></i>
+            </div>
+            <h4 class="text-lg font-black text-white">🖥️ 偵測到行動裝置限制</h4>
+            <p class="text-xs text-slate-300 leading-relaxed">
+                星際 Minecraft 需要電腦（PC/Mac）完整的<strong class="text-emerald-400">鍵盤操控與滑鼠游標鎖定（Pointer Lock）</strong>功能，無法在手機或平板上執行。
+            </p>
+            <p class="text-[11px] text-slate-400 leading-normal">
+                目前您可以選擇將此獎勵兌換為「太空防禦戰」進行瘋狂舒壓！
+            </p>
+            <div class="grid grid-cols-2 gap-3 pt-2">
+                <button onclick="closeMcRestrictModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-extrabold py-2.5 px-4 rounded-xl text-xs transition-colors">
+                    返回
+                </button>
+                <button onclick="switchMcToSpaceShooter()" class="bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-extrabold py-2.5 px-4 rounded-xl text-xs transition-colors shadow-lg shadow-cyan-600/20">
+                    改玩太空防禦
                 </button>
             </div>
         </div>
@@ -477,7 +505,7 @@
                 </div>
             </div>
 
-            <!-- 🚀 3. 太空射擊小遊戲面板 (5題解鎖) -->
+            <!-- 🚀 3. 太空射擊小遊戲面板 (5題解鎖，追加手機搖桿與上下左右4向移動) -->
             <div id="screen-game" class="hidden max-w-2xl mx-auto space-y-4 screen-fade">
                 <div class="bg-gradient-to-r from-slate-950 via-cyan-950 to-indigo-950 border-2 border-cyan-500/40 rounded-3xl p-4 sm:p-6 text-center space-y-3 relative overflow-hidden">
                     <div class="absolute -left-10 -top-10 w-24 h-24 bg-cyan-500/10 rounded-full blur-xl"></div>
@@ -498,21 +526,24 @@
                         </div>
                     </div>
 
+                    <!-- 遊戲畫布與虛擬搖桿覆蓋區 -->
                     <div class="bg-black rounded-2xl border-2 border-cyan-500/30 relative overflow-hidden h-[360px] sm:h-[400px]">
                         <canvas id="shooter-canvas" class="w-full h-full block bg-slate-950"></canvas>
-                        <div class="absolute bottom-4 left-4 right-4 flex justify-between pointer-events-none md:hidden z-10">
-                            <span class="text-[10px] text-slate-500 font-bold bg-slate-950/80 px-3 py-2 rounded-full leading-none">左右滑動螢幕移動戰機（自動發射雷射）</span>
+                        
+                        <!-- 🕹️ 行動端專用虛擬搖桿 (支援上下左右 4 向平滑移動) -->
+                        <div id="joystick-container" class="absolute bottom-6 left-6 w-24 h-24 bg-cyan-500/10 border-2 border-cyan-500/30 rounded-full flex items-center justify-center touch-none select-none z-20 md:hidden opacity-80 active:opacity-100">
+                            <div id="joystick-knob" class="w-10 h-10 bg-gradient-to-tr from-cyan-400 to-indigo-500 rounded-full shadow-lg shadow-cyan-500/50 transform transition-transform duration-75"></div>
                         </div>
                     </div>
 
                     <div class="flex justify-between items-center bg-slate-950/60 p-3 rounded-xl border border-slate-900 text-xs">
                         <span class="text-slate-400">本局擊落積分: <strong id="game-score" class="text-cyan-400">0</strong></span>
-                        <span class="text-slate-500">提示：摧毀隕石或擊退 BOSS 有機率獲得武器道具！</span>
+                        <span class="text-slate-500">提示：手機端使用左下角搖桿進行 360 度全向飛行！</span>
                     </div>
                 </div>
             </div>
 
-            <!-- ⛏️ 4. MINECRAFT (Eaglercraft) 獎勵面板 (10題解鎖且長達10分鐘) -->
+            <!-- ⛏️ 4. MINECRAFT (Eaglercraft) 獎勵面板 (10題解鎖且長達10分鐘，僅限電腦版) -->
             <div id="screen-minecraft" class="hidden w-full max-w-4xl mx-auto space-y-4 screen-fade">
                 <div class="bg-gradient-to-r from-stone-950 via-emerald-950 to-stone-900 border-2 border-emerald-500/50 rounded-3xl p-4 sm:p-6 text-center space-y-3 relative overflow-hidden">
                     <div class="absolute -right-10 -bottom-10 w-32 h-32 bg-emerald-500/10 rounded-full blur-xl"></div>
@@ -541,7 +572,7 @@
                 </div>
             </div>
 
-            <!-- 🏆 5. 全破結算頁籤 -->
+            <!-- 🏆 5. 全破結算頁籤 (📊 大幅升級為深度戰績分析報告) -->
             <div id="screen-victory" class="hidden bg-slate-950 border border-purple-500/30 rounded-3xl p-6 sm:p-8 text-center space-y-6 max-w-2xl mx-auto shadow-2xl screen-fade opacity-0 max-h-[85vh] overflow-y-auto">
                 <div class="flex items-center justify-center gap-3">
                     <div class="w-12 h-12 bg-yellow-500/10 rounded-full border border-yellow-400/30 flex items-center justify-center text-yellow-400 text-2xl animate-bounce">
@@ -615,7 +646,7 @@
                         <i class="fa-solid fa-cubes"></i> 自由 Minecraft
                     </button>
                     <button onclick="restartAll()" class="bg-purple-600 hover:bg-purple-500 text-white font-extrabold py-3.5 px-4 rounded-xl transition-all shadow-md active:scale-95 text-xs uppercase tracking-widest flex items-center justify-center gap-2">
-                        重挑戰 <i class="fa-solid fa-rotate-right ml-1"></i>
+                        重新挑戰 <i class="fa-solid fa-rotate-right ml-1"></i>
                     </button>
                 </div>
             </div>
@@ -1011,7 +1042,7 @@
                 options: ["balcony", "basement", "bench", "cage"],
                 answer: 2,
                 sentenceEn: "We sat on a wooden <span class='text-yellow-400 underline'>bench</span> in the park to eat our sandwiches and rest.",
-                sentenceEnPlain: "We sat on a wooden text bench in the park to eat our sandwiches and rest.",
+                sentenceEnPlain: "We sat on a wooden bench in the park to eat our sandwiches and rest.",
                 sentenceZh: "我們坐在公園的木椅上吃三明治和休息。",
                 explain: "bench (n.) 長椅。"
             },
@@ -1248,15 +1279,21 @@
             localStorage.setItem(STORAGE_KEY, JSON.stringify(stats));
         }
 
+        // 🧬 修正：全數更新排行榜 UI
         function updateStatsUI() {
-            document.getElementById('start-high-score').innerText = stats.highScore.toLocaleString();
-            document.getElementById('start-play-count').innerText = stats.playCount;
+            const highScoreEl = document.getElementById('start-high-score');
+            const playCountEl = document.getElementById('start-play-count');
+            if (highScoreEl) highScoreEl.innerText = stats.highScore.toLocaleString();
+            if (playCountEl) playCountEl.innerText = stats.playCount;
+            
             const lastPlayedEl = document.getElementById('start-last-played');
-            if (stats.lastPlayed) {
-                lastPlayedEl.innerText = `上次挑戰: ${stats.lastPlayed}`;
-                lastPlayedEl.classList.remove('hidden');
-            } else {
-                lastPlayedEl.classList.add('hidden');
+            if (lastPlayedEl) {
+                if (stats.lastPlayed) {
+                    lastPlayedEl.innerText = `上次挑戰: ${stats.lastPlayed}`;
+                    lastPlayedEl.classList.remove('hidden');
+                } else {
+                    lastPlayedEl.classList.add('hidden');
+                }
             }
         }
 
@@ -1580,7 +1617,10 @@
             
             const feedbackCard = document.getElementById('feedback-card');
             feedbackCard.classList.add('hidden');
-            feedbackCard.style.opacity = '0'; 
+            
+            // 🧬 修正：使用 Tailwind 標準轉場類別，避免 inline styles 殘留造成版面錯亂
+            feedbackCard.classList.add('opacity-0');
+            feedbackCard.classList.remove('opacity-100');
             
             document.getElementById('options-panel').classList.remove('pointer-events-none', 'opacity-50');
 
@@ -1608,10 +1648,12 @@
             clearInterval(timer);
             timer = setInterval(() => {
                 timeLeft--;
+                // ⚠️ 確保 timeLeft 絕對不扣到負數 (Clamping)
+                if (timeLeft < 0) timeLeft = 0;
                 document.getElementById('time-left').innerText = `${timeLeft}s`;
                 playSound('tick');
                 
-                if (timeLeft <= 5) {
+                if (timeLeft <= 5 && timeLeft > 0) {
                     document.getElementById('time-left').className = "font-orbitron font-extrabold text-xl text-red-500 animate-bounce";
                 }
 
@@ -1707,8 +1749,18 @@
             const qData = shuffledQuiz[currentIdx];
 
             feedbackCard.classList.remove('hidden');
-            setTimeout(() => feedbackCard.style.opacity = '1', 50);
+            
+            // 🧬 修正：切換 Tailwind 顯隱類別，維持統一動效風格
+            setTimeout(() => {
+                feedbackCard.classList.remove('opacity-0');
+                feedbackCard.classList.add('opacity-100');
+            }, 50);
+
             lastAnsResult = isCorrect;
+
+            document.getElementById('feedback-sentence-en').innerHTML = qData.sentenceEn;
+            document.getElementById('feedback-sentence-zh').innerText = qData.sentenceZh;
+            document.getElementById('feedback-rationale-text').innerText = qData.explain;
 
             const reactionTime = 20 - timeLeft;
             sessionTimeTrack.push(reactionTime);
@@ -1756,7 +1808,7 @@
                 speakEng(qData.sentenceEnPlain);
 
             } else {
-                playSound('shock');
+                playSound('wrong');
                 triggerScreenShake();
                 streak = 0; 
 
@@ -1818,6 +1870,13 @@
         function goToNextStep() {
             // 優先權：優先解鎖 Minecraft，再檢查太空防禦戰
             if (mcTicketsEarned >= 10) {
+                // 🖥️ 限制只有電腦端可以遊玩 Minecraft
+                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 1024;
+                if (isMobile) {
+                    openMcRestrictModal();
+                    return;
+                }
+
                 mcTicketsEarned = 0; 
                 if (spaceTicketsEarned >= 5) {
                     spaceTicketsEarned = 0; // 同步重置
@@ -1859,7 +1918,10 @@
             
             const victoryScreen = document.getElementById('screen-victory');
             victoryScreen.classList.remove('hidden');
-            setTimeout(() => victoryScreen.style.opacity = '1', 50);
+            setTimeout(() => {
+                victoryScreen.classList.remove('opacity-0');
+                victoryScreen.classList.add('opacity-100');
+            }, 50);
 
             document.getElementById('report-total-score').innerText = score.toLocaleString();
             document.getElementById('report-games-played').innerText = unlockedGamesCount + " 次";
@@ -1953,9 +2015,37 @@
             requestStart();
         }
 
+        // 🧬 限制對話框控制函數
+        function openMcRestrictModal() {
+            const modal = document.getElementById('modal-mc-restrict');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            setTimeout(() => modal.classList.remove('opacity-0'), 50);
+        }
+
+        function closeMcRestrictModal() {
+            const modal = document.getElementById('modal-mc-restrict');
+            modal.classList.add('opacity-0');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }, 300);
+        }
+
+        function switchMcToSpaceShooter() {
+            closeMcRestrictModal();
+            // 行動端完美替代：將 Minecraft 答對獎勵直接轉移解鎖太空防禦戰
+            mcTicketsEarned = 0;
+            spaceTicketsEarned = 0;
+            updateTicketDisplay();
+            unlockedGamesCount++;
+            saveCurrentProgress();
+            triggerShooterReward();
+        }
+
 
         // 🌌 ===================================================
-        // 🚀 太空防禦戰 (答對5題獎勵)
+        // 🚀 太空防禦戰 (答對5題獎勵，新增虛擬搖桿與上下左右立體移動)
         // ===================================================
         const canvas = document.getElementById('shooter-canvas');
         const ctx = canvas.getContext('2d');
@@ -1983,9 +2073,17 @@
         let boss = null;
         let bossSpawned = false;
 
+        // 🕹️ 行動端 360 度虛擬搖桿狀態變數
+        let joyActive = false;
+        let joyStartX = 0;
+        let joyStartY = 0;
+        let joyDX = 0; // 水平移動向量 (-1 ~ 1)
+        let joyDY = 0; // 垂直移動向量 (-1 ~ 1)
+        const joyMaxRadius = 35; // 搖桿最遠拖曳半徑 (px)
+
         function resizeCanvas() {
-            canvas.width = canvas.parentElement.clientWidth;
-            canvas.height = canvas.parentElement.clientHeight;
+            canvas.width = canvas.parentElement.clientWidth || window.innerWidth;
+            canvas.height = canvas.parentElement.clientHeight || window.innerHeight;
             player.x = canvas.width / 2 - player.width / 2;
             player.y = canvas.height - 45;
         }
@@ -2014,6 +2112,60 @@
             }
         }
 
+        // 綁定虛擬搖桿的原生 Touch 事件
+        function initMobileJoystick() {
+            const joyContainer = document.getElementById('joystick-container');
+            const joyKnob = document.getElementById('joystick-knob');
+
+            if (!joyContainer || !joyKnob) return;
+
+            // 1. 觸控開始
+            joyContainer.addEventListener('touchstart', (e) => {
+                const t = e.touches[0];
+                const rect = joyContainer.getBoundingClientRect();
+                // 鎖定圓心點
+                joyStartX = rect.left + rect.width / 2;
+                joyStartY = rect.top + rect.height / 2;
+                joyActive = true;
+                e.stopPropagation();
+            }, { passive: true });
+
+            // 2. 觸控滑動 (取得 360 度移動向量)
+            joyContainer.addEventListener('touchmove', (e) => {
+                if (!joyActive) return;
+                const t = e.touches[0];
+                
+                let dx = t.clientX - joyStartX;
+                let dy = t.clientY - joyStartY;
+                const dist = Math.hypot(dx, dy);
+
+                // 限制圓球不拖曳出邊界
+                if (dist > joyMaxRadius) {
+                    dx = (dx / dist) * joyMaxRadius;
+                    dy = (dy / dist) * joyMaxRadius;
+                }
+
+                joyKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+                
+                // 歸一化向量 (-1.0 ~ 1.0) 供主迴圈讀取
+                joyDX = dx / joyMaxRadius;
+                joyDY = dy / joyMaxRadius;
+                
+                e.stopPropagation();
+            }, { passive: true });
+
+            // 3. 釋放搖桿歸位
+            const resetJoy = () => {
+                joyActive = false;
+                joyDX = 0;
+                joyDY = 0;
+                joyKnob.style.transform = "translate(0px, 0px)";
+            };
+
+            joyContainer.addEventListener('touchend', resetJoy, { passive: true });
+            joyContainer.addEventListener('touchcancel', resetJoy, { passive: true });
+        }
+
         function triggerShooterReward() {
             if (!isFreePlayMode) {
                 document.getElementById('screen-quiz').classList.add('hidden');
@@ -2021,7 +2173,10 @@
             
             const gameScreen = document.getElementById('screen-game');
             gameScreen.classList.remove('hidden');
-            setTimeout(() => gameScreen.style.opacity = '1', 50);
+            setTimeout(() => {
+                gameScreen.classList.remove('opacity-0');
+                gameScreen.classList.add('opacity-100');
+            }, 50);
             
             gameScore = 0;
             shooterTimeLeft = 30;
@@ -2046,10 +2201,12 @@
             playSound('unlock');
             resizeCanvas();
 
+            // 鍵盤與滑鼠監聽
             window.addEventListener('keydown', handleKeyDown);
             window.addEventListener('keyup', handleKeyUp);
-            canvas.addEventListener('touchstart', handleTouchStart, { passive: true });
-            canvas.addEventListener('touchmove', handleTouchMove, { passive: true });
+            
+            // 初始化搖桿觸控系統
+            initMobileJoystick();
 
             isShooterRunning = true;
             requestAnimationFrame(updateShooter);
@@ -2057,6 +2214,8 @@
             clearInterval(shooterTimer);
             shooterTimer = setInterval(() => {
                 shooterTimeLeft--;
+                // ⚠️ 確保 shooterTimeLeft 絕對不扣到負數 (Clamping)
+                if (shooterTimeLeft < 0) shooterTimeLeft = 0;
                 document.getElementById('game-timer').innerText = `${shooterTimeLeft}s`;
                 
                 if (shooterTimeLeft === 15 && !bossSpawned) {
@@ -2088,25 +2247,13 @@
 
         function handleKeyDown(e) {
             keys[e.code] = true;
-            if (e.code === 'Space') {
+            // 阻斷空白鍵與方向鍵頁面滑動
+            if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
                 e.preventDefault(); 
             }
         }
         function handleKeyUp(e) {
             keys[e.code] = false;
-        }
-
-        function handleTouchStart(e) {
-            touchStartX = e.touches[0].clientX;
-        }
-        function handleTouchMove(e) {
-            const touchX = e.touches[0].clientX;
-            const diff = touchX - touchStartX;
-            player.x += diff * 1.5; 
-            touchStartX = touchX;
-
-            if (player.x < 0) player.x = 0;
-            if (player.x > canvas.width - player.width) player.x = canvas.width - player.width;
         }
 
         function createExplosion(x, y, color) {
@@ -2141,13 +2288,31 @@
                 ctx.stroke();
             }
 
+            // 🚀 PC 鍵盤 4 向全功能移動控制
             if (keys['ArrowLeft'] || keys['KeyA']) {
                 player.x = Math.max(0, player.x - player.speed);
             }
             if (keys['ArrowRight'] || keys['KeyD']) {
                 player.x = Math.min(canvas.width - player.width, player.x + player.speed);
             }
+            if (keys['ArrowUp'] || keys['KeyW']) {
+                player.y = Math.max(0, player.y - player.speed);
+            }
+            if (keys['ArrowDown'] || keys['KeyS']) {
+                player.y = Math.min(canvas.height - player.height, player.y + player.speed);
+            }
 
+            // 🕹️ 行動端虛擬搖桿 4 向融合移動控制
+            if (joyActive && (joyDX !== 0 || joyDY !== 0)) {
+                player.x += joyDX * player.speed;
+                player.y += joyDY * player.speed;
+
+                // 物理邊界碰撞夾幅
+                player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+                player.y = Math.max(0, Math.min(canvas.height - player.height, player.y));
+            }
+
+            // 自動武器射擊
             if (timestamp - lastShotTime > 150) {
                 if (player.weapon === 'normal') {
                     bullets.push({ x: player.x + player.width / 2 - 2, y: player.y, vx: 0, vy: -11, width: 4, height: 12, color: '#fb7185', power: 1 });
@@ -2164,6 +2329,7 @@
                 lastShotTime = timestamp;
             }
 
+            // 繪製戰機幾何體
             ctx.fillStyle = '#22d3ee'; 
             ctx.beginPath();
             ctx.moveTo(player.x + player.width / 2, player.y);
@@ -2171,7 +2337,7 @@
             ctx.lineTo(player.x + player.width, player.y + player.height);
             ctx.closePath();
             ctx.fill();
-            
+            // 發光尾翼
             ctx.fillStyle = '#f43f5e';
             ctx.fillRect(player.x + player.width / 2 - 4, player.y + player.height, 8, 4);
 
@@ -2418,6 +2584,43 @@
             }
         }
 
+        function damagePlayerShield() {
+            playSound('wrong');
+            triggerScreenShake();
+            player.hp--;
+            updateHPDisplay();
+
+            if (player.hp <= 0) {
+                endShooterGame();
+            }
+        }
+
+        function endShooterGame() {
+            isShooterRunning = false;
+            clearInterval(shooterTimer);
+
+            window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('keyup', handleKeyUp);
+
+            document.getElementById('screen-game').classList.add('hidden');
+
+            // 判斷是否為自由遊玩模式，結束後回到 Victory 結算畫面
+            if (isFreePlayMode) {
+                const victoryScreen = document.getElementById('screen-victory');
+                victoryScreen.classList.remove('hidden');
+                setTimeout(() => {
+                    victoryScreen.classList.remove('opacity-0');
+                    victoryScreen.classList.add('opacity-100');
+                }, 50);
+                
+                document.getElementById('report-asteroids').innerText = totalAsteroidsSmashed;
+                document.getElementById('report-bosses').innerText = totalBossesDestroyed;
+            } else {
+                document.getElementById('screen-quiz').classList.remove('hidden');
+                proceedToNextQuiz();
+            }
+        }
+
 
         // 🌌 ===================================================
         // ⛏️ MINECRAFT 獎勵引擎 (答對10題解鎖)
@@ -2429,7 +2632,10 @@
 
             const mcScreen = document.getElementById('screen-minecraft');
             mcScreen.classList.remove('hidden');
-            setTimeout(() => mcScreen.style.opacity = '1', 50);
+            setTimeout(() => {
+                mcScreen.classList.remove('opacity-0');
+                mcScreen.classList.add('opacity-100');
+            }, 50);
 
             // 載入與初始化 EaglercraftX Iframe
             const iframe = document.getElementById('minecraft-iframe');
@@ -2444,6 +2650,8 @@
             clearInterval(mcTimerInterval);
             mcTimerInterval = setInterval(() => {
                 mcTimeLeft--;
+                // ⚠️ 確保 mcTimeLeft 絕對不扣到負數 (Clamping)
+                if (mcTimeLeft < 0) mcTimeLeft = 0;
                 formatMcTimerText();
 
                 if (mcTimeLeft % 60 === 0 && mcTimeLeft > 0) {
@@ -2457,8 +2665,9 @@
         }
 
         function formatMcTimerText() {
-            const mins = Math.floor(mcTimeLeft / 60);
-            const secs = mcTimeLeft % 60;
+            const displayTime = Math.max(0, mcTimeLeft);
+            const mins = Math.floor(displayTime / 60);
+            const secs = displayTime % 60;
             const displayStr = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
             document.getElementById('mc-timer').innerText = displayStr;
         }
@@ -2476,7 +2685,10 @@
             if (isFreeMinecraftMode) {
                 const victoryScreen = document.getElementById('screen-victory');
                 victoryScreen.classList.remove('hidden');
-                setTimeout(() => victoryScreen.style.opacity = '1', 50);
+                setTimeout(() => {
+                    victoryScreen.classList.remove('opacity-0');
+                    victoryScreen.classList.add('opacity-100');
+                }, 50);
             } else {
                 document.getElementById('screen-quiz').classList.remove('hidden');
                 proceedToNextQuiz();
