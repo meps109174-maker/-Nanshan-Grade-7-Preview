@@ -1,10 +1,9 @@
-```html
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>星際字彙搶答終端 - Space Shooter Reward Edition</title>
+    <title>星際字彙搶答終端 - Minecraft & Space Shooter Reward Edition</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Google Fonts -->
@@ -167,22 +166,6 @@
                     gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
                     osc.start();
                     osc.stop(audioCtx.currentTime + 0.25);
-                } else if (type === 'laser') {
-                    osc.type = 'triangle';
-                    osc.frequency.setValueAtTime(880, audioCtx.currentTime);
-                    osc.frequency.exponentialRampToValueAtTime(110, audioCtx.currentTime + 0.15);
-                    gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
-                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
-                    osc.start();
-                    osc.stop(audioCtx.currentTime + 0.15);
-                } else if (type === 'explode') {
-                    osc.type = 'sawtooth';
-                    osc.frequency.setValueAtTime(100, audioCtx.currentTime);
-                    osc.frequency.exponentialRampToValueAtTime(10, audioCtx.currentTime + 0.3);
-                    gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
-                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
-                    osc.start();
-                    osc.stop(audioCtx.currentTime + 0.3);
                 } else if (type === 'powerup') {
                     osc.type = 'sine';
                     osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); 
@@ -242,7 +225,7 @@
         </div>
         <h3 class="text-xl font-black text-white mb-2">建議旋轉螢幕</h3>
         <p class="text-slate-400 text-xs max-w-xs mb-6 leading-relaxed">
-            旋轉至「橫向（Landscape）」螢幕可以獲得最佳的雷射戰機防禦視野與舒適的答題按鈕體驗！
+            旋轉至「橫向（Landscape）」螢幕可以獲得最佳的遊戲視野與舒適的答題按鈕體驗！
         </p>
         <button onclick="dismissLandscapeAlert()" class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-extrabold px-8 py-3 rounded-xl text-xs tracking-wider shadow-lg">
             保持直向繼續
@@ -315,9 +298,14 @@
                     <span class="text-slate-400 block text-[9px] uppercase tracking-widest font-bold">SCORE</span>
                     <span id="global-score" class="text-yellow-400 text-lg sm:text-xl font-black">0</span>
                 </div>
+                <!-- 雙軌解鎖進度條 -->
                 <div class="text-right hidden sm:block">
-                    <span class="text-slate-400 block text-[9px] uppercase tracking-widest font-bold">GAME TICKET</span>
-                    <span id="ticket-progress-text" class="text-cyan-400 text-sm font-black">0 / 5</span>
+                    <div class="text-cyan-400 text-xs">
+                        🎟️ 太空防禦: <span id="space-ticket-text" class="font-black">0 / 5</span>
+                    </div>
+                    <div class="text-emerald-400 text-xs">
+                        💎 Minecraft: <span id="mc-ticket-text" class="font-black">0 / 10</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -325,9 +313,9 @@
 
     <!-- 主要視窗管理系統 -->
     <main class="flex-grow flex items-center justify-center px-4 py-6 z-10">
-        <div class="w-full max-w-4xl">
+        <div id="main-game-container" class="w-full max-w-4xl transition-transform duration-100">
 
-            <!-- 🟢 1. 遊戲開始與載入頁面 (集成自選題數功能) -->
+            <!-- 🟢 1. 遊戲開始與載入頁面 (集成自選題數功能與標榜) -->
             <div id="screen-start" class="bg-slate-900/40 border border-purple-500/30 rounded-3xl p-6 sm:p-10 text-center space-y-6 max-w-xl mx-auto backdrop-blur-md shadow-2xl relative overflow-hidden transition-all duration-500 transform hover:scale-[1.01]">
                 <div class="absolute -right-20 -bottom-20 w-60 h-60 bg-purple-600/10 rounded-full blur-3xl"></div>
                 <div class="absolute -left-20 -top-20 w-60 h-60 bg-indigo-600/10 rounded-full blur-3xl"></div>
@@ -336,17 +324,17 @@
                     <div class="absolute inset-0 rounded-full border-2 border-dashed border-purple-500/40 animate-[spin_12s_linear_infinite]"></div>
                     <div class="absolute inset-2 rounded-full border border-double border-cyan-500/30 animate-[spin_6s_linear_infinite_reverse]"></div>
                     <div class="absolute inset-4 bg-purple-500/10 border border-purple-500/30 rounded-full flex items-center justify-center text-purple-400 text-2xl">
-                        <i class="fa-solid fa-shuttle-space animate-bounce"></i>
+                        <i class="fa-solid fa-cubes animate-bounce"></i>
                     </div>
                 </div>
 
                 <div class="space-y-2">
                     <h2 class="text-2xl sm:text-3xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-white via-purple-200 to-cyan-300 drop-shadow">
-                        星際精準搶答擂台
+                        星際字彙搶答挑戰
                     </h2>
                     <p class="text-slate-300 text-xs sm:text-sm leading-relaxed max-w-md mx-auto">
-                        單字提示已被隱藏，請在 20 秒內解鎖情境。
-                        <span class="text-cyan-300 font-bold block mt-0.5">每答對 5 題，即可解鎖雷射戰機防禦小遊戲！</span>
+                        單字提示已被隱藏，請在 20 秒內解鎖正確的語意上下文。
+                        <span class="text-cyan-300 font-bold block mt-1"><i class="fa-solid fa-rocket text-cyan-400 mr-1 animate-pulse"></i> 答對 5 題解鎖太空防禦戰，答對 10 題更可解鎖 (10分鐘) Minecraft 星際探險！</span>
                     </p>
                 </div>
 
@@ -409,7 +397,10 @@
                             QUESTION: <span id="quiz-index-text">1 / 41</span>
                         </span>
                         <span class="bg-cyan-500/10 text-cyan-400 text-xs font-bold px-3 py-1.5 rounded-lg border border-cyan-500/20 sm:hidden">
-                            🎟️ <span id="mini-ticket-text">0 / 5</span>
+                            🚀 <span id="mini-space-ticket-text">0 / 5</span>
+                        </span>
+                        <span class="bg-emerald-500/10 text-emerald-400 text-xs font-bold px-3 py-1.5 rounded-lg border border-emerald-500/20 sm:hidden">
+                            💎 <span id="mini-mc-ticket-text">0 / 10</span>
                         </span>
                     </div>
 
@@ -486,7 +477,7 @@
                 </div>
             </div>
 
-            <!-- 🚀 3. 太空射擊獎勵小遊戲 -->
+            <!-- 🚀 3. 太空射擊小遊戲面板 (5題解鎖) -->
             <div id="screen-game" class="hidden max-w-2xl mx-auto space-y-4 screen-fade">
                 <div class="bg-gradient-to-r from-slate-950 via-cyan-950 to-indigo-950 border-2 border-cyan-500/40 rounded-3xl p-4 sm:p-6 text-center space-y-3 relative overflow-hidden">
                     <div class="absolute -left-10 -top-10 w-24 h-24 bg-cyan-500/10 rounded-full blur-xl"></div>
@@ -521,7 +512,36 @@
                 </div>
             </div>
 
-            <!-- 🏆 4. 全破結算頁籤 (📊 大幅升級為深度戰績分析報告) -->
+            <!-- ⛏️ 4. MINECRAFT (Eaglercraft) 獎勵面板 (10題解鎖且長達10分鐘) -->
+            <div id="screen-minecraft" class="hidden w-full max-w-4xl mx-auto space-y-4 screen-fade">
+                <div class="bg-gradient-to-r from-stone-950 via-emerald-950 to-stone-900 border-2 border-emerald-500/50 rounded-3xl p-4 sm:p-6 text-center space-y-3 relative overflow-hidden">
+                    <div class="absolute -right-10 -bottom-10 w-32 h-32 bg-emerald-500/10 rounded-full blur-xl"></div>
+                    
+                    <div class="flex justify-between items-center text-xs font-extrabold">
+                        <span class="text-emerald-400 tracking-widest"><i class="fa-solid fa-cubes mr-1 animate-pulse"></i> 答對 10 題終極獎勵！星際 Minecraft 冒險</span>
+                        <span class="text-yellow-400 bg-black/40 px-3 py-1.5 rounded-lg border border-yellow-500/20">
+                            限時剩餘: <strong id="mc-timer" class="font-orbitron text-sm">10:00</strong>
+                        </span>
+                    </div>
+
+                    <!-- Minecraft 嵌入式 Eaglercraft 框架 (全硬體與滑鼠鎖定授權全開) -->
+                    <div class="bg-black rounded-2xl border border-emerald-500/30 overflow-hidden relative h-[500px] w-full">
+                        <iframe id="minecraft-iframe" class="w-full h-full border-0 block" src="about:blank" allow="keyboard-lock; pointer-lock; fullscreen; gamepad; autoplay"></iframe>
+                    </div>
+
+                    <div class="flex justify-between items-center bg-slate-950/80 p-3.5 rounded-xl border border-slate-900 text-xs">
+                        <span class="text-slate-400 flex items-center gap-1">
+                            <i class="fa-solid fa-mouse-pointer text-emerald-400"></i>
+                            <span>提示：點擊遊戲畫面以鎖定滑鼠。按 <kbd class="bg-slate-800 px-1.5 py-0.5 rounded text-white text-[10px] font-mono">Esc</kbd> 釋放滑鼠游標。</span>
+                        </span>
+                        <button onclick="endMinecraftEarly()" class="bg-rose-950/80 hover:bg-rose-900 text-rose-300 font-extrabold px-4 py-2 rounded-lg border border-rose-500/20 transition-all text-[11px]">
+                            提前結束冒險
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 🏆 5. 全破結算頁籤 -->
             <div id="screen-victory" class="hidden bg-slate-950 border border-purple-500/30 rounded-3xl p-6 sm:p-8 text-center space-y-6 max-w-2xl mx-auto shadow-2xl screen-fade opacity-0 max-h-[85vh] overflow-y-auto">
                 <div class="flex items-center justify-center gap-3">
                     <div class="w-12 h-12 bg-yellow-500/10 rounded-full border border-yellow-400/30 flex items-center justify-center text-yellow-400 text-2xl animate-bounce">
@@ -544,7 +564,7 @@
                     <div class="bg-slate-900/60 p-4 rounded-2xl border border-slate-800 flex flex-col justify-center items-center">
                         <span class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">航行能力判定</span>
                         <div id="report-rank" class="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-amber-500 font-orbitron my-2">S</div>
-                        <span id="report-rank-text" class="text-xs text-yellow-400 font-bold">超星系主宰</span>
+                        <span id="report-rank-text" class="text-xs text-yellow-400 font-black tracking-widest">超星系主宰</span>
                     </div>
 
                     <!-- 2. 核心數據報告 -->
@@ -578,7 +598,7 @@
                     </div>
                 </div>
 
-                <!-- ⚠️ 最容易答錯的題目 / 弱點偵測 (動態產生) -->
+                <!-- ⚠️ 最容易答錯的題目 -->
                 <div id="wrong-questions-section" class="hidden text-left bg-slate-950/60 border border-slate-900 p-4 rounded-2xl space-y-3">
                     <h5 class="text-xs font-black text-rose-400 tracking-wider uppercase"><i class="fa-solid fa-compass-drafting mr-1"></i> 需要加強的星際字彙 (錯題清單)</h5>
                     <div id="wrong-questions-list" class="space-y-2 max-h-[160px] overflow-y-auto pr-1">
@@ -586,9 +606,18 @@
                     </div>
                 </div>
 
-                <button onclick="restartAll()" class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-extrabold py-3.5 px-6 rounded-xl transition-all shadow-md active:scale-95 text-sm uppercase tracking-widest">
-                    重啟下一趟探險航星 <i class="fa-solid fa-rotate-right ml-1"></i>
-                </button>
+                <!-- 底部雙重自由遊玩按鈕 -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <button onclick="startFreePlayGame()" class="bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-extrabold py-3.5 px-4 rounded-xl transition-all shadow-md active:scale-95 text-xs uppercase tracking-widest flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-gamepad"></i> 自由防禦戰 (舒壓)
+                    </button>
+                    <button onclick="startFreeMinecraft()" class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold py-3.5 px-4 rounded-xl transition-all shadow-md active:scale-95 text-xs uppercase tracking-widest flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-cubes"></i> 自由 Minecraft
+                    </button>
+                    <button onclick="restartAll()" class="bg-purple-600 hover:bg-purple-500 text-white font-extrabold py-3.5 px-4 rounded-xl transition-all shadow-md active:scale-95 text-xs uppercase tracking-widest flex items-center justify-center gap-2">
+                        重挑戰 <i class="fa-solid fa-rotate-right ml-1"></i>
+                    </button>
+                </div>
             </div>
 
         </div>
@@ -612,7 +641,7 @@
         <p>© 2026 國中進階英語字彙搶答平台. Designed to spark motivation.</p>
     </footer>
 
-    <!-- 🔮 星際搶答與太空射擊引擎核心 JavaScript -->
+    <!-- 🔮 星際搶答、太空射擊與 Minecraft 雙軌防禦引擎 JavaScript -->
     <script>
         // 41個核心進階單字資料集 - 已完成完美審核校對
         const quizDB = [
@@ -982,7 +1011,7 @@
                 options: ["balcony", "basement", "bench", "cage"],
                 answer: 2,
                 sentenceEn: "We sat on a wooden <span class='text-yellow-400 underline'>bench</span> in the park to eat our sandwiches and rest.",
-                sentenceEnPlain: "We sat on a wooden bench in the park to eat our sandwiches and rest.",
+                sentenceEnPlain: "We sat on a wooden text bench in the park to eat our sandwiches and rest.",
                 sentenceZh: "我們坐在公園的木椅上吃三明治和休息。",
                 explain: "bench (n.) 長椅。"
             },
@@ -1034,16 +1063,16 @@
         let score = 0;
         let streak = 0;
         let correctCount = 0;
-        let ticketsEarned = 0; 
+        let spaceTicketsEarned = 0; // 太空防禦戰答對累計進度 (0~5)
+        let mcTicketsEarned = 0;    // Minecraft 答對累計進度 (0~10)
         let unlockedGamesCount = 0; 
-        let lastAnsResult = null; 
 
         // 🔢 題數選擇狀態
         let selectedCount = 41; 
 
         // 🏆 排行榜與 LocalStorage 配置
         const STORAGE_KEY = "star_vocab_leaderboard_data_v2";
-        const SESSION_KEY = "star_vocab_active_session_v4"; // 升級時空密鑰以適配統計報告
+        const SESSION_KEY = "star_vocab_active_session_v5"; // 時空密鑰升級以容納雙軌 ticket
         const PREF_COUNT_KEY = "star_vocab_preferred_count";
         
         let stats = {
@@ -1054,10 +1083,12 @@
 
         // 📊 本局統計分析專用狀態
         let sessionStartTime = 0;
-        let sessionTimeTrack = []; // 紀錄每道題決策耗時
-        let sessionWrongWords = []; // 紀錄本局答錯或超時的單字
-        let totalAsteroidsSmashed = 0; // 本局擊碎隕石計數
-        let totalBossesDestroyed = 0;  // 本局擊沈 Boss 母艦計數
+        let sessionTimeTrack = []; 
+        let sessionWrongWords = []; 
+        let totalAsteroidsSmashed = 0; 
+        let totalBossesDestroyed = 0;  
+        let isFreePlayMode = false; // 題目結束後的自由防禦戰模式
+        let isFreeMinecraftMode = false; // 題目結束後的自由 Minecraft 模式
 
         // ⏱️ 計時器變數
         let timer = null;
@@ -1068,6 +1099,11 @@
         let shooterTimeLeft = 30;
         let shooterScore = 0;
         let isShooterRunning = false;
+
+        // ⛏️ Minecraft 計時器變數
+        let mcTimerInterval = null;
+        let mcTimeLeft = 600; // 10分鐘 = 600秒
+        let isMinecraftRunning = false;
 
         // 🌌 背景粒子與煙火引擎
         const bgCanvas = document.getElementById('bg-stars-canvas');
@@ -1324,7 +1360,8 @@
                     score = sessionData.score;
                     streak = sessionData.streak;
                     correctCount = sessionData.correctCount;
-                    ticketsEarned = sessionData.ticketsEarned;
+                    spaceTicketsEarned = sessionData.spaceTicketsEarned || 0;
+                    mcTicketsEarned = sessionData.mcTicketsEarned || 0;
                     unlockedGamesCount = sessionData.unlockedGamesCount;
 
                     // 📊 同步恢復本局統計數據
@@ -1380,7 +1417,8 @@
                 score: score,
                 streak: streak,
                 correctCount: correctCount,
-                ticketsEarned: ticketsEarned,
+                spaceTicketsEarned: spaceTicketsEarned,
+                mcTicketsEarned: mcTicketsEarned,
                 unlockedGamesCount: unlockedGamesCount,
                 // 📊 統計分析保存
                 sessionStartTime: sessionStartTime,
@@ -1394,6 +1432,22 @@
 
         function clearSavedProgress() {
             localStorage.removeItem(SESSION_KEY);
+        }
+
+        // 🚀 🟢 結算頁面自由玩防禦戰啟動函數
+        function startFreePlayGame() {
+            isFreePlayMode = true;
+            isFreeMinecraftMode = false;
+            document.getElementById('screen-victory').classList.add('hidden');
+            triggerShooterReward();
+        }
+
+        // 🚀 🟢 結算頁面自由玩 Minecraft 啟動函數
+        function startFreeMinecraft() {
+            isFreePlayMode = false;
+            isFreeMinecraftMode = true;
+            document.getElementById('screen-victory').classList.add('hidden');
+            triggerMinecraftReward();
         }
 
         // 🚀 初始化
@@ -1491,7 +1545,8 @@
             score = 0;
             streak = 0;
             correctCount = 0;
-            ticketsEarned = 0;
+            spaceTicketsEarned = 0;
+            mcTicketsEarned = 0;
             unlockedGamesCount = 0;
 
             // 📊 重置本局專用數據報告
@@ -1500,6 +1555,8 @@
             sessionWrongWords = [];
             totalAsteroidsSmashed = 0;
             totalBossesDestroyed = 0;
+            isFreePlayMode = false;
+            isFreeMinecraftMode = false;
 
             document.getElementById('global-score').innerText = score;
             document.getElementById('streak-badge').classList.add('hidden');
@@ -1653,18 +1710,14 @@
             setTimeout(() => feedbackCard.style.opacity = '1', 50);
             lastAnsResult = isCorrect;
 
-            document.getElementById('feedback-sentence-en').innerHTML = qData.sentenceEn;
-            document.getElementById('feedback-sentence-zh').innerText = qData.sentenceZh;
-            document.getElementById('feedback-rationale-text').innerText = qData.explain;
-
-            // 📊 戰績反應反應速度記錄 (20秒減去剩餘時間)
             const reactionTime = 20 - timeLeft;
             sessionTimeTrack.push(reactionTime);
 
             if (isCorrect) {
                 correctCount++;
                 streak++;
-                ticketsEarned++; 
+                spaceTicketsEarned++; 
+                mcTicketsEarned++;
 
                 const multiplier = Math.min(2.0, 1.0 + (streak * 0.1)).toFixed(1);
                 
@@ -1703,11 +1756,10 @@
                 speakEng(qData.sentenceEnPlain);
 
             } else {
-                playSound('wrong');
+                playSound('shock');
                 triggerScreenShake();
                 streak = 0; 
 
-                // 📊 錯題弱點分析記錄
                 if (!sessionWrongWords.some(item => item.word === qData.word)) {
                     sessionWrongWords.push({
                         word: qData.word,
@@ -1736,18 +1788,26 @@
         }
 
         function updateTicketDisplay() {
-            const displays = ['ticket-progress-text', 'mini-ticket-text'];
-            displays.forEach(id => {
-                const el = document.getElementById(id);
-                if (el) {
-                    el.innerText = `${ticketsEarned} / 5`;
-                    if (ticketsEarned >= 5) {
-                        el.className = "text-yellow-400 font-extrabold animate-pulse text-sm sm:text-base";
-                    } else {
-                        el.className = "text-cyan-400 text-sm font-black";
-                    }
-                }
-            });
+            // 桌機版 header
+            document.getElementById('space-ticket-text').innerText = `${spaceTicketsEarned} / 5`;
+            document.getElementById('mc-ticket-text').innerText = `${mcTicketsEarned} / 10`;
+            
+            // 行動版 mini banner
+            document.getElementById('mini-space-ticket-text').innerText = `${spaceTicketsEarned} / 5`;
+            document.getElementById('mini-mc-ticket-text').innerText = `${mcTicketsEarned} / 10`;
+
+            // 發光呼吸動態控制
+            if (spaceTicketsEarned >= 5) {
+                document.getElementById('space-ticket-text').className = "text-yellow-400 font-extrabold animate-pulse";
+            } else {
+                document.getElementById('space-ticket-text').className = "text-cyan-400 font-black";
+            }
+
+            if (mcTicketsEarned >= 10) {
+                document.getElementById('mc-ticket-text').className = "text-emerald-400 font-extrabold animate-pulse";
+            } else {
+                document.getElementById('mc-ticket-text').className = "text-emerald-400 font-black";
+            }
         }
 
         function speakCorrectExample() {
@@ -1756,14 +1816,28 @@
         }
 
         function goToNextStep() {
-            if (ticketsEarned >= 5) {
-                ticketsEarned = 0; 
+            // 優先權：優先解鎖 Minecraft，再檢查太空防禦戰
+            if (mcTicketsEarned >= 10) {
+                mcTicketsEarned = 0; 
+                if (spaceTicketsEarned >= 5) {
+                    spaceTicketsEarned = 0; // 同步重置
+                }
+                updateTicketDisplay();
+                unlockedGamesCount++;
+                saveCurrentProgress(); 
+                triggerMinecraftReward(); 
+                return;
+            }
+
+            if (spaceTicketsEarned >= 5) {
+                spaceTicketsEarned = 0; 
                 updateTicketDisplay();
                 unlockedGamesCount++;
                 saveCurrentProgress(); 
                 triggerShooterReward(); 
                 return;
             }
+
             proceedToNextQuiz();
         }
 
@@ -1776,22 +1850,20 @@
             }
         }
 
-        // 🏆 終局！生成深度戰績分析報告
         function showFinalVictoryScreen() {
             clearSavedProgress();
 
             document.getElementById('screen-quiz').classList.add('hidden');
             document.getElementById('screen-game').classList.add('hidden');
+            document.getElementById('screen-minecraft').classList.add('hidden');
             
             const victoryScreen = document.getElementById('screen-victory');
             victoryScreen.classList.remove('hidden');
             setTimeout(() => victoryScreen.style.opacity = '1', 50);
 
-            // 1. 基本數值渲染
             document.getElementById('report-total-score').innerText = score.toLocaleString();
             document.getElementById('report-games-played').innerText = unlockedGamesCount + " 次";
 
-            // 2. 正確率與進度計算
             const accVal = Math.round((correctCount / shuffledQuiz.length) * 100);
             document.getElementById('report-accuracy').innerText = `${accVal}%`;
             if (accVal >= 80) {
@@ -1802,16 +1874,13 @@
                 document.getElementById('report-accuracy').className = "text-rose-500 text-base font-orbitron";
             }
 
-            // 3. 平均答題反應時間
             const totalReaction = sessionTimeTrack.reduce((a, b) => a + b, 0);
             const avgReaction = (sessionTimeTrack.length > 0 ? (totalReaction / sessionTimeTrack.length) : 0).toFixed(1);
             document.getElementById('report-speed').innerText = `${avgReaction}s / 題`;
 
-            // 4. 太空小遊戲防禦總擊落戰果
             document.getElementById('report-asteroids').innerText = totalAsteroidsSmashed;
             document.getElementById('report-bosses').innerText = totalBossesDestroyed;
 
-            // 5. 評定航行等級 S, A, B, C
             const rankEl = document.getElementById('report-rank');
             const rankTextEl = document.getElementById('report-rank-text');
             if (accVal >= 90) {
@@ -1836,7 +1905,6 @@
                 rankTextEl.className = "text-xs text-slate-400 font-bold tracking-widest";
             }
 
-            // 6. 弱點錯題動態清單渲染
             const wrongSection = document.getElementById('wrong-questions-section');
             const wrongList = document.getElementById('wrong-questions-list');
             wrongList.innerHTML = '';
@@ -1861,7 +1929,6 @@
                 wrongSection.classList.add('hidden');
             }
 
-            // 💾 儲存並檢查是否突破歷史紀錄
             const newRecordGained = checkAndSetHighScore(score);
             const banner = document.getElementById('new-record-banner');
             
@@ -1881,12 +1948,14 @@
 
         function restartAll() {
             clearSavedProgress();
+            isFreePlayMode = false;
+            isFreeMinecraftMode = false;
             requestStart();
         }
 
 
         // 🌌 ===================================================
-        // 🎁 太空防禦戰 (HP, 武器升級與 BOSS 大改版)
+        // 🚀 太空防禦戰 (答對5題獎勵)
         // ===================================================
         const canvas = document.getElementById('shooter-canvas');
         const ctx = canvas.getContext('2d');
@@ -1946,7 +2015,9 @@
         }
 
         function triggerShooterReward() {
-            document.getElementById('screen-quiz').classList.add('hidden');
+            if (!isFreePlayMode) {
+                document.getElementById('screen-quiz').classList.add('hidden');
+            }
             
             const gameScreen = document.getElementById('screen-game');
             gameScreen.classList.remove('hidden');
@@ -2347,30 +2418,69 @@
             }
         }
 
-        function damagePlayerShield() {
-            playSound('wrong');
-            triggerScreenShake();
-            player.hp--;
-            updateHPDisplay();
 
-            if (player.hp <= 0) {
-                endShooterGame();
+        // 🌌 ===================================================
+        // ⛏️ MINECRAFT 獎勵引擎 (答對10題解鎖)
+        // ===================================================
+        function triggerMinecraftReward() {
+            if (!isFreeMinecraftMode) {
+                document.getElementById('screen-quiz').classList.add('hidden');
             }
+
+            const mcScreen = document.getElementById('screen-minecraft');
+            mcScreen.classList.remove('hidden');
+            setTimeout(() => mcScreen.style.opacity = '1', 50);
+
+            // 載入與初始化 EaglercraftX Iframe
+            const iframe = document.getElementById('minecraft-iframe');
+            iframe.src = "EaglercraftX_1.8.html"; // 呼叫本地上傳世界
+
+            mcTimeLeft = 600; // 10分鐘 = 600秒
+            formatMcTimerText();
+            playSound('unlock');
+
+            isMinecraftRunning = true;
+
+            clearInterval(mcTimerInterval);
+            mcTimerInterval = setInterval(() => {
+                mcTimeLeft--;
+                formatMcTimerText();
+
+                if (mcTimeLeft % 60 === 0 && mcTimeLeft > 0) {
+                    playSound('tick-high'); // 每過一分鐘輕響提醒
+                }
+
+                if (mcTimeLeft <= 0) {
+                    endMinecraftEarly();
+                }
+            }, 1000);
         }
 
-        function endShooterGame() {
-            isShooterRunning = false;
-            clearInterval(shooterTimer);
+        function formatMcTimerText() {
+            const mins = Math.floor(mcTimeLeft / 60);
+            const secs = mcTimeLeft % 60;
+            const displayStr = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            document.getElementById('mc-timer').innerText = displayStr;
+        }
 
-            window.removeEventListener('keydown', handleKeyDown);
-            window.removeEventListener('keyup', handleKeyUp);
-            canvas.removeEventListener('touchstart', handleTouchStart);
-            canvas.removeEventListener('touchmove', handleTouchMove);
+        function endMinecraftEarly() {
+            isMinecraftRunning = false;
+            clearInterval(mcTimerInterval);
 
-            document.getElementById('screen-game').classList.add('hidden');
-            document.getElementById('screen-quiz').classList.remove('hidden');
+            // 釋放 iframe 資源，避免背景卡頓
+            const iframe = document.getElementById('minecraft-iframe');
+            iframe.src = "about:blank";
 
-            proceedToNextQuiz();
+            document.getElementById('screen-minecraft').classList.add('hidden');
+
+            if (isFreeMinecraftMode) {
+                const victoryScreen = document.getElementById('screen-victory');
+                victoryScreen.classList.remove('hidden');
+                setTimeout(() => victoryScreen.style.opacity = '1', 50);
+            } else {
+                document.getElementById('screen-quiz').classList.remove('hidden');
+                proceedToNextQuiz();
+            }
         }
 
 
@@ -2399,5 +2509,3 @@
     </script>
 </body>
 </html>
-
-```
